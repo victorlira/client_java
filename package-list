@@ -3,6 +3,7 @@ io.prometheus.client
 io.prometheus.client.bridge
 io.prometheus.client.cache.caffeine
 io.prometheus.client.dropwizard
+io.prometheus.client.dropwizard.samplebuilder
 io.prometheus.client.exporter
 io.prometheus.client.exporter.common
 io.prometheus.client.filter

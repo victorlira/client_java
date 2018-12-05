@@ -73,15 +73,15 @@
 <span class="sourceLineNo">065</span><a name="line.65"></a>
 <span class="sourceLineNo">066</span>            t.getResponseHeaders().set("Content-Type",<a name="line.66"></a>
 <span class="sourceLineNo">067</span>                    TextFormat.CONTENT_TYPE_004);<a name="line.67"></a>
-<span class="sourceLineNo">068</span>            t.getResponseHeaders().set("Content-Length",<a name="line.68"></a>
-<span class="sourceLineNo">069</span>                    String.valueOf(response.size()));<a name="line.69"></a>
-<span class="sourceLineNo">070</span>            if (shouldUseCompression(t)) {<a name="line.70"></a>
-<span class="sourceLineNo">071</span>                t.getResponseHeaders().set("Content-Encoding", "gzip");<a name="line.71"></a>
-<span class="sourceLineNo">072</span>                t.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);<a name="line.72"></a>
-<span class="sourceLineNo">073</span>                final GZIPOutputStream os = new GZIPOutputStream(t.getResponseBody());<a name="line.73"></a>
-<span class="sourceLineNo">074</span>                response.writeTo(os);<a name="line.74"></a>
-<span class="sourceLineNo">075</span>                os.finish();<a name="line.75"></a>
-<span class="sourceLineNo">076</span>            } else {<a name="line.76"></a>
+<span class="sourceLineNo">068</span>            if (shouldUseCompression(t)) {<a name="line.68"></a>
+<span class="sourceLineNo">069</span>                t.getResponseHeaders().set("Content-Encoding", "gzip");<a name="line.69"></a>
+<span class="sourceLineNo">070</span>                t.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);<a name="line.70"></a>
+<span class="sourceLineNo">071</span>                final GZIPOutputStream os = new GZIPOutputStream(t.getResponseBody());<a name="line.71"></a>
+<span class="sourceLineNo">072</span>                response.writeTo(os);<a name="line.72"></a>
+<span class="sourceLineNo">073</span>                os.close();<a name="line.73"></a>
+<span class="sourceLineNo">074</span>            } else {<a name="line.74"></a>
+<span class="sourceLineNo">075</span>                t.getResponseHeaders().set("Content-Length",<a name="line.75"></a>
+<span class="sourceLineNo">076</span>                        String.valueOf(response.size()));<a name="line.76"></a>
 <span class="sourceLineNo">077</span>                t.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.size());<a name="line.77"></a>
 <span class="sourceLineNo">078</span>                response.writeTo(t.getResponseBody());<a name="line.78"></a>
 <span class="sourceLineNo">079</span>            }<a name="line.79"></a>
@@ -228,8 +228,15 @@
 <span class="sourceLineNo">220</span>        server.stop(0);<a name="line.220"></a>
 <span class="sourceLineNo">221</span>        executorService.shutdown(); // Free any (parked/idle) threads in pool<a name="line.221"></a>
 <span class="sourceLineNo">222</span>    }<a name="line.222"></a>
-<span class="sourceLineNo">223</span>}<a name="line.223"></a>
-<span class="sourceLineNo">224</span><a name="line.224"></a>
+<span class="sourceLineNo">223</span><a name="line.223"></a>
+<span class="sourceLineNo">224</span>    /**<a name="line.224"></a>
+<span class="sourceLineNo">225</span>     * Gets the port number.<a name="line.225"></a>
+<span class="sourceLineNo">226</span>     */<a name="line.226"></a>
+<span class="sourceLineNo">227</span>    public int getPort() {<a name="line.227"></a>
+<span class="sourceLineNo">228</span>        return server.getAddress().getPort();<a name="line.228"></a>
+<span class="sourceLineNo">229</span>    }<a name="line.229"></a>
+<span class="sourceLineNo">230</span>}<a name="line.230"></a>
+<span class="sourceLineNo">231</span><a name="line.231"></a>
 
 
 

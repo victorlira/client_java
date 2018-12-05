@@ -98,39 +98,40 @@
 <span class="sourceLineNo">090</span>        entry.getValue()<a name="line.90"></a>
 <span class="sourceLineNo">091</span>      );<a name="line.91"></a>
 <span class="sourceLineNo">092</span>    }<a name="line.92"></a>
-<span class="sourceLineNo">093</span>  }<a name="line.93"></a>
-<span class="sourceLineNo">094</span><a name="line.94"></a>
-<span class="sourceLineNo">095</span>  private Map&lt;Thread.State, Integer&gt; getThreadStateCountMap() {<a name="line.95"></a>
-<span class="sourceLineNo">096</span>    // Get thread information without computing any stack traces<a name="line.96"></a>
-<span class="sourceLineNo">097</span>    ThreadInfo[] allThreads = threadBean.getThreadInfo(threadBean.getAllThreadIds(), 0);<a name="line.97"></a>
-<span class="sourceLineNo">098</span><a name="line.98"></a>
-<span class="sourceLineNo">099</span>    // Initialize the map with all thread states<a name="line.99"></a>
-<span class="sourceLineNo">100</span>    HashMap&lt;Thread.State, Integer&gt; threadCounts = new HashMap&lt;Thread.State, Integer&gt;();<a name="line.100"></a>
-<span class="sourceLineNo">101</span>    for (Thread.State state : Thread.State.values()) {<a name="line.101"></a>
-<span class="sourceLineNo">102</span>      threadCounts.put(state, 0);<a name="line.102"></a>
-<span class="sourceLineNo">103</span>    }<a name="line.103"></a>
-<span class="sourceLineNo">104</span><a name="line.104"></a>
-<span class="sourceLineNo">105</span>    // Collect the actual thread counts<a name="line.105"></a>
-<span class="sourceLineNo">106</span>    for (ThreadInfo curThread : allThreads) {<a name="line.106"></a>
-<span class="sourceLineNo">107</span>      if (curThread != null) {<a name="line.107"></a>
-<span class="sourceLineNo">108</span>        Thread.State threadState = curThread.getThreadState();<a name="line.108"></a>
-<span class="sourceLineNo">109</span>        threadCounts.put(threadState, threadCounts.get(threadState) + 1);<a name="line.109"></a>
-<span class="sourceLineNo">110</span>      }<a name="line.110"></a>
-<span class="sourceLineNo">111</span>    }<a name="line.111"></a>
-<span class="sourceLineNo">112</span><a name="line.112"></a>
-<span class="sourceLineNo">113</span>    return threadCounts;<a name="line.113"></a>
-<span class="sourceLineNo">114</span>  }<a name="line.114"></a>
-<span class="sourceLineNo">115</span><a name="line.115"></a>
-<span class="sourceLineNo">116</span>  private static double nullSafeArrayLength(long[] array) {<a name="line.116"></a>
-<span class="sourceLineNo">117</span>    return null == array ? 0 : array.length;<a name="line.117"></a>
-<span class="sourceLineNo">118</span>  }<a name="line.118"></a>
-<span class="sourceLineNo">119</span><a name="line.119"></a>
-<span class="sourceLineNo">120</span>  public List&lt;MetricFamilySamples&gt; collect() {<a name="line.120"></a>
-<span class="sourceLineNo">121</span>    List&lt;MetricFamilySamples&gt; mfs = new ArrayList&lt;MetricFamilySamples&gt;();<a name="line.121"></a>
-<span class="sourceLineNo">122</span>    addThreadMetrics(mfs);<a name="line.122"></a>
-<span class="sourceLineNo">123</span>    return mfs;<a name="line.123"></a>
-<span class="sourceLineNo">124</span>  }<a name="line.124"></a>
-<span class="sourceLineNo">125</span>}<a name="line.125"></a>
+<span class="sourceLineNo">093</span>    sampleFamilies.add(threadStateFamily);<a name="line.93"></a>
+<span class="sourceLineNo">094</span>  }<a name="line.94"></a>
+<span class="sourceLineNo">095</span><a name="line.95"></a>
+<span class="sourceLineNo">096</span>  private Map&lt;Thread.State, Integer&gt; getThreadStateCountMap() {<a name="line.96"></a>
+<span class="sourceLineNo">097</span>    // Get thread information without computing any stack traces<a name="line.97"></a>
+<span class="sourceLineNo">098</span>    ThreadInfo[] allThreads = threadBean.getThreadInfo(threadBean.getAllThreadIds(), 0);<a name="line.98"></a>
+<span class="sourceLineNo">099</span><a name="line.99"></a>
+<span class="sourceLineNo">100</span>    // Initialize the map with all thread states<a name="line.100"></a>
+<span class="sourceLineNo">101</span>    HashMap&lt;Thread.State, Integer&gt; threadCounts = new HashMap&lt;Thread.State, Integer&gt;();<a name="line.101"></a>
+<span class="sourceLineNo">102</span>    for (Thread.State state : Thread.State.values()) {<a name="line.102"></a>
+<span class="sourceLineNo">103</span>      threadCounts.put(state, 0);<a name="line.103"></a>
+<span class="sourceLineNo">104</span>    }<a name="line.104"></a>
+<span class="sourceLineNo">105</span><a name="line.105"></a>
+<span class="sourceLineNo">106</span>    // Collect the actual thread counts<a name="line.106"></a>
+<span class="sourceLineNo">107</span>    for (ThreadInfo curThread : allThreads) {<a name="line.107"></a>
+<span class="sourceLineNo">108</span>      if (curThread != null) {<a name="line.108"></a>
+<span class="sourceLineNo">109</span>        Thread.State threadState = curThread.getThreadState();<a name="line.109"></a>
+<span class="sourceLineNo">110</span>        threadCounts.put(threadState, threadCounts.get(threadState) + 1);<a name="line.110"></a>
+<span class="sourceLineNo">111</span>      }<a name="line.111"></a>
+<span class="sourceLineNo">112</span>    }<a name="line.112"></a>
+<span class="sourceLineNo">113</span><a name="line.113"></a>
+<span class="sourceLineNo">114</span>    return threadCounts;<a name="line.114"></a>
+<span class="sourceLineNo">115</span>  }<a name="line.115"></a>
+<span class="sourceLineNo">116</span><a name="line.116"></a>
+<span class="sourceLineNo">117</span>  private static double nullSafeArrayLength(long[] array) {<a name="line.117"></a>
+<span class="sourceLineNo">118</span>    return null == array ? 0 : array.length;<a name="line.118"></a>
+<span class="sourceLineNo">119</span>  }<a name="line.119"></a>
+<span class="sourceLineNo">120</span><a name="line.120"></a>
+<span class="sourceLineNo">121</span>  public List&lt;MetricFamilySamples&gt; collect() {<a name="line.121"></a>
+<span class="sourceLineNo">122</span>    List&lt;MetricFamilySamples&gt; mfs = new ArrayList&lt;MetricFamilySamples&gt;();<a name="line.122"></a>
+<span class="sourceLineNo">123</span>    addThreadMetrics(mfs);<a name="line.123"></a>
+<span class="sourceLineNo">124</span>    return mfs;<a name="line.124"></a>
+<span class="sourceLineNo">125</span>  }<a name="line.125"></a>
+<span class="sourceLineNo">126</span>}<a name="line.126"></a>
 
 
 
