@@ -35,7 +35,7 @@
 <span class="sourceLineNo">027</span>   */<a name="line.27"></a>
 <span class="sourceLineNo">028</span>  public static final CollectorRegistry defaultRegistry = new CollectorRegistry(true);<a name="line.28"></a>
 <span class="sourceLineNo">029</span><a name="line.29"></a>
-<span class="sourceLineNo">030</span><a name="line.30"></a>
+<span class="sourceLineNo">030</span>  private final Object namesCollectorsLock = new Object();<a name="line.30"></a>
 <span class="sourceLineNo">031</span>  private final Map&lt;Collector, List&lt;String&gt;&gt; collectorsToNames = new HashMap&lt;Collector, List&lt;String&gt;&gt;();<a name="line.31"></a>
 <span class="sourceLineNo">032</span>  private final Map&lt;String, Collector&gt; namesToCollectors = new HashMap&lt;String, Collector&gt;();<a name="line.32"></a>
 <span class="sourceLineNo">033</span><a name="line.33"></a>
@@ -56,7 +56,7 @@
 <span class="sourceLineNo">048</span>   */<a name="line.48"></a>
 <span class="sourceLineNo">049</span>  public void register(Collector m) {<a name="line.49"></a>
 <span class="sourceLineNo">050</span>    List&lt;String&gt; names = collectorNames(m);<a name="line.50"></a>
-<span class="sourceLineNo">051</span>    synchronized (collectorsToNames) {<a name="line.51"></a>
+<span class="sourceLineNo">051</span>    synchronized (namesCollectorsLock) {<a name="line.51"></a>
 <span class="sourceLineNo">052</span>      for (String name : names) {<a name="line.52"></a>
 <span class="sourceLineNo">053</span>        if (namesToCollectors.containsKey(name)) {<a name="line.53"></a>
 <span class="sourceLineNo">054</span>          throw new IllegalArgumentException("Collector already registered that provides name: " + name);<a name="line.54"></a>
@@ -73,7 +73,7 @@
 <span class="sourceLineNo">065</span>   * Unregister a Collector.<a name="line.65"></a>
 <span class="sourceLineNo">066</span>   */<a name="line.66"></a>
 <span class="sourceLineNo">067</span>  public void unregister(Collector m) {<a name="line.67"></a>
-<span class="sourceLineNo">068</span>    synchronized (collectorsToNames) {<a name="line.68"></a>
+<span class="sourceLineNo">068</span>    synchronized (namesCollectorsLock) {<a name="line.68"></a>
 <span class="sourceLineNo">069</span>      List&lt;String&gt; names = collectorsToNames.remove(m);<a name="line.69"></a>
 <span class="sourceLineNo">070</span>      for (String name : names) {<a name="line.70"></a>
 <span class="sourceLineNo">071</span>        namesToCollectors.remove(name);<a name="line.71"></a>
@@ -85,7 +85,7 @@
 <span class="sourceLineNo">077</span>   * Unregister all Collectors.<a name="line.77"></a>
 <span class="sourceLineNo">078</span>   */<a name="line.78"></a>
 <span class="sourceLineNo">079</span>  public void clear() {<a name="line.79"></a>
-<span class="sourceLineNo">080</span>    synchronized (collectorsToNames) {<a name="line.80"></a>
+<span class="sourceLineNo">080</span>    synchronized (namesCollectorsLock) {<a name="line.80"></a>
 <span class="sourceLineNo">081</span>      collectorsToNames.clear();<a name="line.81"></a>
 <span class="sourceLineNo">082</span>      namesToCollectors.clear();<a name="line.82"></a>
 <span class="sourceLineNo">083</span>    }<a name="line.83"></a>
@@ -95,7 +95,7 @@
 <span class="sourceLineNo">087</span>   * A snapshot of the current collectors.<a name="line.87"></a>
 <span class="sourceLineNo">088</span>   */<a name="line.88"></a>
 <span class="sourceLineNo">089</span>  private Set&lt;Collector&gt; collectors() {<a name="line.89"></a>
-<span class="sourceLineNo">090</span>    synchronized (collectorsToNames) {<a name="line.90"></a>
+<span class="sourceLineNo">090</span>    synchronized (namesCollectorsLock) {<a name="line.90"></a>
 <span class="sourceLineNo">091</span>      return new HashSet&lt;Collector&gt;(collectorsToNames.keySet());<a name="line.91"></a>
 <span class="sourceLineNo">092</span>    }<a name="line.92"></a>
 <span class="sourceLineNo">093</span>  }<a name="line.93"></a>
@@ -138,126 +138,133 @@
 <span class="sourceLineNo">130</span>    return new MetricFamilySamplesEnumeration();<a name="line.130"></a>
 <span class="sourceLineNo">131</span>  }<a name="line.131"></a>
 <span class="sourceLineNo">132</span><a name="line.132"></a>
-<span class="sourceLineNo">133</span>  public Enumeration&lt;Collector.MetricFamilySamples&gt; filteredMetricFamilySamples(Set&lt;String&gt; includedNames) {<a name="line.133"></a>
-<span class="sourceLineNo">134</span>    return new MetricFamilySamplesEnumeration(includedNames);<a name="line.134"></a>
-<span class="sourceLineNo">135</span>  }<a name="line.135"></a>
-<span class="sourceLineNo">136</span><a name="line.136"></a>
-<span class="sourceLineNo">137</span>  class MetricFamilySamplesEnumeration implements Enumeration&lt;Collector.MetricFamilySamples&gt; {<a name="line.137"></a>
-<span class="sourceLineNo">138</span><a name="line.138"></a>
-<span class="sourceLineNo">139</span>    private final Iterator&lt;Collector&gt; collectorIter;<a name="line.139"></a>
-<span class="sourceLineNo">140</span>    private Iterator&lt;Collector.MetricFamilySamples&gt; metricFamilySamples;<a name="line.140"></a>
-<span class="sourceLineNo">141</span>    private Collector.MetricFamilySamples next;<a name="line.141"></a>
-<span class="sourceLineNo">142</span>    private Set&lt;String&gt; includedNames;<a name="line.142"></a>
+<span class="sourceLineNo">133</span>  /**<a name="line.133"></a>
+<span class="sourceLineNo">134</span>   * Enumeration of metrics matching the specified names.<a name="line.134"></a>
+<span class="sourceLineNo">135</span>   * &lt;p&gt;<a name="line.135"></a>
+<span class="sourceLineNo">136</span>   * Note that the provided set of names will be matched against the time series<a name="line.136"></a>
+<span class="sourceLineNo">137</span>   * name and not the metric name. For instance, to retrieve all samples from a<a name="line.137"></a>
+<span class="sourceLineNo">138</span>   * histogram, you must include the '_count', '_sum' and '_bucket' names.<a name="line.138"></a>
+<span class="sourceLineNo">139</span>   */<a name="line.139"></a>
+<span class="sourceLineNo">140</span>  public Enumeration&lt;Collector.MetricFamilySamples&gt; filteredMetricFamilySamples(Set&lt;String&gt; includedNames) {<a name="line.140"></a>
+<span class="sourceLineNo">141</span>    return new MetricFamilySamplesEnumeration(includedNames);<a name="line.141"></a>
+<span class="sourceLineNo">142</span>  }<a name="line.142"></a>
 <span class="sourceLineNo">143</span><a name="line.143"></a>
-<span class="sourceLineNo">144</span>    MetricFamilySamplesEnumeration(Set&lt;String&gt; includedNames) {<a name="line.144"></a>
-<span class="sourceLineNo">145</span>      this.includedNames = includedNames;<a name="line.145"></a>
-<span class="sourceLineNo">146</span>      collectorIter = includedCollectorIterator(includedNames);<a name="line.146"></a>
-<span class="sourceLineNo">147</span>      findNextElement();<a name="line.147"></a>
-<span class="sourceLineNo">148</span>    }<a name="line.148"></a>
-<span class="sourceLineNo">149</span><a name="line.149"></a>
-<span class="sourceLineNo">150</span>    private Iterator&lt;Collector&gt; includedCollectorIterator(Set&lt;String&gt; includedNames) {<a name="line.150"></a>
-<span class="sourceLineNo">151</span>      if (includedNames.isEmpty()) {<a name="line.151"></a>
-<span class="sourceLineNo">152</span>        return collectors().iterator();<a name="line.152"></a>
-<span class="sourceLineNo">153</span>      } else {<a name="line.153"></a>
-<span class="sourceLineNo">154</span>        HashSet&lt;Collector&gt; collectors = new HashSet&lt;Collector&gt;();<a name="line.154"></a>
-<span class="sourceLineNo">155</span>        synchronized (namesToCollectors) {<a name="line.155"></a>
-<span class="sourceLineNo">156</span>          for (Map.Entry&lt;String, Collector&gt; entry : namesToCollectors.entrySet()) {<a name="line.156"></a>
-<span class="sourceLineNo">157</span>            if (includedNames.contains(entry.getKey())) {<a name="line.157"></a>
-<span class="sourceLineNo">158</span>              collectors.add(entry.getValue());<a name="line.158"></a>
-<span class="sourceLineNo">159</span>            }<a name="line.159"></a>
-<span class="sourceLineNo">160</span>          }<a name="line.160"></a>
-<span class="sourceLineNo">161</span>        }<a name="line.161"></a>
-<span class="sourceLineNo">162</span><a name="line.162"></a>
-<span class="sourceLineNo">163</span>        return collectors.iterator();<a name="line.163"></a>
-<span class="sourceLineNo">164</span>      }<a name="line.164"></a>
-<span class="sourceLineNo">165</span>    }<a name="line.165"></a>
-<span class="sourceLineNo">166</span><a name="line.166"></a>
-<span class="sourceLineNo">167</span>    MetricFamilySamplesEnumeration() {<a name="line.167"></a>
-<span class="sourceLineNo">168</span>      this(Collections.&lt;String&gt;emptySet());<a name="line.168"></a>
-<span class="sourceLineNo">169</span>    }<a name="line.169"></a>
-<span class="sourceLineNo">170</span><a name="line.170"></a>
-<span class="sourceLineNo">171</span>    private void findNextElement() {<a name="line.171"></a>
-<span class="sourceLineNo">172</span>      next = null;<a name="line.172"></a>
+<span class="sourceLineNo">144</span>  class MetricFamilySamplesEnumeration implements Enumeration&lt;Collector.MetricFamilySamples&gt; {<a name="line.144"></a>
+<span class="sourceLineNo">145</span><a name="line.145"></a>
+<span class="sourceLineNo">146</span>    private final Iterator&lt;Collector&gt; collectorIter;<a name="line.146"></a>
+<span class="sourceLineNo">147</span>    private Iterator&lt;Collector.MetricFamilySamples&gt; metricFamilySamples;<a name="line.147"></a>
+<span class="sourceLineNo">148</span>    private Collector.MetricFamilySamples next;<a name="line.148"></a>
+<span class="sourceLineNo">149</span>    private Set&lt;String&gt; includedNames;<a name="line.149"></a>
+<span class="sourceLineNo">150</span><a name="line.150"></a>
+<span class="sourceLineNo">151</span>    MetricFamilySamplesEnumeration(Set&lt;String&gt; includedNames) {<a name="line.151"></a>
+<span class="sourceLineNo">152</span>      this.includedNames = includedNames;<a name="line.152"></a>
+<span class="sourceLineNo">153</span>      collectorIter = includedCollectorIterator(includedNames);<a name="line.153"></a>
+<span class="sourceLineNo">154</span>      findNextElement();<a name="line.154"></a>
+<span class="sourceLineNo">155</span>    }<a name="line.155"></a>
+<span class="sourceLineNo">156</span><a name="line.156"></a>
+<span class="sourceLineNo">157</span>    private Iterator&lt;Collector&gt; includedCollectorIterator(Set&lt;String&gt; includedNames) {<a name="line.157"></a>
+<span class="sourceLineNo">158</span>      if (includedNames.isEmpty()) {<a name="line.158"></a>
+<span class="sourceLineNo">159</span>        return collectors().iterator();<a name="line.159"></a>
+<span class="sourceLineNo">160</span>      } else {<a name="line.160"></a>
+<span class="sourceLineNo">161</span>        HashSet&lt;Collector&gt; collectors = new HashSet&lt;Collector&gt;();<a name="line.161"></a>
+<span class="sourceLineNo">162</span>        synchronized (namesCollectorsLock) {<a name="line.162"></a>
+<span class="sourceLineNo">163</span>          for (Map.Entry&lt;String, Collector&gt; entry : namesToCollectors.entrySet()) {<a name="line.163"></a>
+<span class="sourceLineNo">164</span>            if (includedNames.contains(entry.getKey())) {<a name="line.164"></a>
+<span class="sourceLineNo">165</span>              collectors.add(entry.getValue());<a name="line.165"></a>
+<span class="sourceLineNo">166</span>            }<a name="line.166"></a>
+<span class="sourceLineNo">167</span>          }<a name="line.167"></a>
+<span class="sourceLineNo">168</span>        }<a name="line.168"></a>
+<span class="sourceLineNo">169</span><a name="line.169"></a>
+<span class="sourceLineNo">170</span>        return collectors.iterator();<a name="line.170"></a>
+<span class="sourceLineNo">171</span>      }<a name="line.171"></a>
+<span class="sourceLineNo">172</span>    }<a name="line.172"></a>
 <span class="sourceLineNo">173</span><a name="line.173"></a>
-<span class="sourceLineNo">174</span>      while (metricFamilySamples != null &amp;&amp; metricFamilySamples.hasNext()) {<a name="line.174"></a>
-<span class="sourceLineNo">175</span>        next = filter(metricFamilySamples.next());<a name="line.175"></a>
-<span class="sourceLineNo">176</span>        if (next != null) {<a name="line.176"></a>
-<span class="sourceLineNo">177</span>          return;<a name="line.177"></a>
-<span class="sourceLineNo">178</span>        }<a name="line.178"></a>
-<span class="sourceLineNo">179</span>      }<a name="line.179"></a>
+<span class="sourceLineNo">174</span>    MetricFamilySamplesEnumeration() {<a name="line.174"></a>
+<span class="sourceLineNo">175</span>      this(Collections.&lt;String&gt;emptySet());<a name="line.175"></a>
+<span class="sourceLineNo">176</span>    }<a name="line.176"></a>
+<span class="sourceLineNo">177</span><a name="line.177"></a>
+<span class="sourceLineNo">178</span>    private void findNextElement() {<a name="line.178"></a>
+<span class="sourceLineNo">179</span>      next = null;<a name="line.179"></a>
 <span class="sourceLineNo">180</span><a name="line.180"></a>
-<span class="sourceLineNo">181</span>      if (next == null) {<a name="line.181"></a>
-<span class="sourceLineNo">182</span>        while (collectorIter.hasNext()) {<a name="line.182"></a>
-<span class="sourceLineNo">183</span>          metricFamilySamples = collectorIter.next().collect().iterator();<a name="line.183"></a>
-<span class="sourceLineNo">184</span>          while (metricFamilySamples.hasNext()) {<a name="line.184"></a>
-<span class="sourceLineNo">185</span>            next = filter(metricFamilySamples.next());<a name="line.185"></a>
-<span class="sourceLineNo">186</span>            if (next != null) {<a name="line.186"></a>
-<span class="sourceLineNo">187</span>              return;<a name="line.187"></a>
-<span class="sourceLineNo">188</span>            }<a name="line.188"></a>
-<span class="sourceLineNo">189</span>          }<a name="line.189"></a>
-<span class="sourceLineNo">190</span>        }<a name="line.190"></a>
-<span class="sourceLineNo">191</span>      }<a name="line.191"></a>
-<span class="sourceLineNo">192</span>    }<a name="line.192"></a>
-<span class="sourceLineNo">193</span><a name="line.193"></a>
-<span class="sourceLineNo">194</span>    private Collector.MetricFamilySamples filter(Collector.MetricFamilySamples next) {<a name="line.194"></a>
-<span class="sourceLineNo">195</span>      if (includedNames.isEmpty()) {<a name="line.195"></a>
-<span class="sourceLineNo">196</span>        return next;<a name="line.196"></a>
-<span class="sourceLineNo">197</span>      } else {<a name="line.197"></a>
-<span class="sourceLineNo">198</span>        Iterator&lt;Collector.MetricFamilySamples.Sample&gt; it = next.samples.iterator();<a name="line.198"></a>
-<span class="sourceLineNo">199</span>        while (it.hasNext()) {<a name="line.199"></a>
-<span class="sourceLineNo">200</span>            if (!includedNames.contains(it.next().name)) {<a name="line.200"></a>
-<span class="sourceLineNo">201</span>                it.remove();<a name="line.201"></a>
-<span class="sourceLineNo">202</span>            }<a name="line.202"></a>
-<span class="sourceLineNo">203</span>        }<a name="line.203"></a>
-<span class="sourceLineNo">204</span>        if (next.samples.size() == 0) {<a name="line.204"></a>
-<span class="sourceLineNo">205</span>          return null;<a name="line.205"></a>
-<span class="sourceLineNo">206</span>        }<a name="line.206"></a>
-<span class="sourceLineNo">207</span>        return next;<a name="line.207"></a>
-<span class="sourceLineNo">208</span>      }<a name="line.208"></a>
-<span class="sourceLineNo">209</span>    }<a name="line.209"></a>
-<span class="sourceLineNo">210</span><a name="line.210"></a>
-<span class="sourceLineNo">211</span>    public Collector.MetricFamilySamples nextElement() {<a name="line.211"></a>
-<span class="sourceLineNo">212</span>      Collector.MetricFamilySamples current = next;<a name="line.212"></a>
-<span class="sourceLineNo">213</span>      if (current == null) {<a name="line.213"></a>
-<span class="sourceLineNo">214</span>        throw new NoSuchElementException();<a name="line.214"></a>
+<span class="sourceLineNo">181</span>      while (metricFamilySamples != null &amp;&amp; metricFamilySamples.hasNext()) {<a name="line.181"></a>
+<span class="sourceLineNo">182</span>        next = filter(metricFamilySamples.next());<a name="line.182"></a>
+<span class="sourceLineNo">183</span>        if (next != null) {<a name="line.183"></a>
+<span class="sourceLineNo">184</span>          return;<a name="line.184"></a>
+<span class="sourceLineNo">185</span>        }<a name="line.185"></a>
+<span class="sourceLineNo">186</span>      }<a name="line.186"></a>
+<span class="sourceLineNo">187</span><a name="line.187"></a>
+<span class="sourceLineNo">188</span>      if (next == null) {<a name="line.188"></a>
+<span class="sourceLineNo">189</span>        while (collectorIter.hasNext()) {<a name="line.189"></a>
+<span class="sourceLineNo">190</span>          metricFamilySamples = collectorIter.next().collect().iterator();<a name="line.190"></a>
+<span class="sourceLineNo">191</span>          while (metricFamilySamples.hasNext()) {<a name="line.191"></a>
+<span class="sourceLineNo">192</span>            next = filter(metricFamilySamples.next());<a name="line.192"></a>
+<span class="sourceLineNo">193</span>            if (next != null) {<a name="line.193"></a>
+<span class="sourceLineNo">194</span>              return;<a name="line.194"></a>
+<span class="sourceLineNo">195</span>            }<a name="line.195"></a>
+<span class="sourceLineNo">196</span>          }<a name="line.196"></a>
+<span class="sourceLineNo">197</span>        }<a name="line.197"></a>
+<span class="sourceLineNo">198</span>      }<a name="line.198"></a>
+<span class="sourceLineNo">199</span>    }<a name="line.199"></a>
+<span class="sourceLineNo">200</span><a name="line.200"></a>
+<span class="sourceLineNo">201</span>    private Collector.MetricFamilySamples filter(Collector.MetricFamilySamples next) {<a name="line.201"></a>
+<span class="sourceLineNo">202</span>      if (includedNames.isEmpty()) {<a name="line.202"></a>
+<span class="sourceLineNo">203</span>        return next;<a name="line.203"></a>
+<span class="sourceLineNo">204</span>      } else {<a name="line.204"></a>
+<span class="sourceLineNo">205</span>        Iterator&lt;Collector.MetricFamilySamples.Sample&gt; it = next.samples.iterator();<a name="line.205"></a>
+<span class="sourceLineNo">206</span>        while (it.hasNext()) {<a name="line.206"></a>
+<span class="sourceLineNo">207</span>            if (!includedNames.contains(it.next().name)) {<a name="line.207"></a>
+<span class="sourceLineNo">208</span>                it.remove();<a name="line.208"></a>
+<span class="sourceLineNo">209</span>            }<a name="line.209"></a>
+<span class="sourceLineNo">210</span>        }<a name="line.210"></a>
+<span class="sourceLineNo">211</span>        if (next.samples.size() == 0) {<a name="line.211"></a>
+<span class="sourceLineNo">212</span>          return null;<a name="line.212"></a>
+<span class="sourceLineNo">213</span>        }<a name="line.213"></a>
+<span class="sourceLineNo">214</span>        return next;<a name="line.214"></a>
 <span class="sourceLineNo">215</span>      }<a name="line.215"></a>
-<span class="sourceLineNo">216</span>      findNextElement();<a name="line.216"></a>
-<span class="sourceLineNo">217</span>      return current;<a name="line.217"></a>
-<span class="sourceLineNo">218</span>    }<a name="line.218"></a>
-<span class="sourceLineNo">219</span><a name="line.219"></a>
-<span class="sourceLineNo">220</span>    public boolean hasMoreElements() {<a name="line.220"></a>
-<span class="sourceLineNo">221</span>      return next != null;<a name="line.221"></a>
-<span class="sourceLineNo">222</span>    }<a name="line.222"></a>
-<span class="sourceLineNo">223</span>  }<a name="line.223"></a>
-<span class="sourceLineNo">224</span><a name="line.224"></a>
-<span class="sourceLineNo">225</span>  /**<a name="line.225"></a>
-<span class="sourceLineNo">226</span>   * Returns the given value, or null if it doesn't exist.<a name="line.226"></a>
-<span class="sourceLineNo">227</span>   * &lt;p&gt;<a name="line.227"></a>
-<span class="sourceLineNo">228</span>   * This is inefficient, and intended only for use in unittests.<a name="line.228"></a>
-<span class="sourceLineNo">229</span>   */<a name="line.229"></a>
-<span class="sourceLineNo">230</span>  public Double getSampleValue(String name) {<a name="line.230"></a>
-<span class="sourceLineNo">231</span>    return getSampleValue(name, new String[]{}, new String[]{});<a name="line.231"></a>
-<span class="sourceLineNo">232</span>  }<a name="line.232"></a>
-<span class="sourceLineNo">233</span><a name="line.233"></a>
-<span class="sourceLineNo">234</span>  /**<a name="line.234"></a>
-<span class="sourceLineNo">235</span>   * Returns the given value, or null if it doesn't exist.<a name="line.235"></a>
-<span class="sourceLineNo">236</span>   * &lt;p&gt;<a name="line.236"></a>
-<span class="sourceLineNo">237</span>   * This is inefficient, and intended only for use in unittests.<a name="line.237"></a>
-<span class="sourceLineNo">238</span>   */<a name="line.238"></a>
-<span class="sourceLineNo">239</span>  public Double getSampleValue(String name, String[] labelNames, String[] labelValues) {<a name="line.239"></a>
-<span class="sourceLineNo">240</span>    for (Collector.MetricFamilySamples metricFamilySamples : Collections.list(metricFamilySamples())) {<a name="line.240"></a>
-<span class="sourceLineNo">241</span>      for (Collector.MetricFamilySamples.Sample sample : metricFamilySamples.samples) {<a name="line.241"></a>
-<span class="sourceLineNo">242</span>        if (sample.name.equals(name)<a name="line.242"></a>
-<span class="sourceLineNo">243</span>                &amp;&amp; Arrays.equals(sample.labelNames.toArray(), labelNames)<a name="line.243"></a>
-<span class="sourceLineNo">244</span>                &amp;&amp; Arrays.equals(sample.labelValues.toArray(), labelValues)) {<a name="line.244"></a>
-<span class="sourceLineNo">245</span>          return sample.value;<a name="line.245"></a>
-<span class="sourceLineNo">246</span>        }<a name="line.246"></a>
-<span class="sourceLineNo">247</span>      }<a name="line.247"></a>
-<span class="sourceLineNo">248</span>    }<a name="line.248"></a>
-<span class="sourceLineNo">249</span>    return null;<a name="line.249"></a>
-<span class="sourceLineNo">250</span>  }<a name="line.250"></a>
-<span class="sourceLineNo">251</span><a name="line.251"></a>
-<span class="sourceLineNo">252</span>}<a name="line.252"></a>
+<span class="sourceLineNo">216</span>    }<a name="line.216"></a>
+<span class="sourceLineNo">217</span><a name="line.217"></a>
+<span class="sourceLineNo">218</span>    public Collector.MetricFamilySamples nextElement() {<a name="line.218"></a>
+<span class="sourceLineNo">219</span>      Collector.MetricFamilySamples current = next;<a name="line.219"></a>
+<span class="sourceLineNo">220</span>      if (current == null) {<a name="line.220"></a>
+<span class="sourceLineNo">221</span>        throw new NoSuchElementException();<a name="line.221"></a>
+<span class="sourceLineNo">222</span>      }<a name="line.222"></a>
+<span class="sourceLineNo">223</span>      findNextElement();<a name="line.223"></a>
+<span class="sourceLineNo">224</span>      return current;<a name="line.224"></a>
+<span class="sourceLineNo">225</span>    }<a name="line.225"></a>
+<span class="sourceLineNo">226</span><a name="line.226"></a>
+<span class="sourceLineNo">227</span>    public boolean hasMoreElements() {<a name="line.227"></a>
+<span class="sourceLineNo">228</span>      return next != null;<a name="line.228"></a>
+<span class="sourceLineNo">229</span>    }<a name="line.229"></a>
+<span class="sourceLineNo">230</span>  }<a name="line.230"></a>
+<span class="sourceLineNo">231</span><a name="line.231"></a>
+<span class="sourceLineNo">232</span>  /**<a name="line.232"></a>
+<span class="sourceLineNo">233</span>   * Returns the given value, or null if it doesn't exist.<a name="line.233"></a>
+<span class="sourceLineNo">234</span>   * &lt;p&gt;<a name="line.234"></a>
+<span class="sourceLineNo">235</span>   * This is inefficient, and intended only for use in unittests.<a name="line.235"></a>
+<span class="sourceLineNo">236</span>   */<a name="line.236"></a>
+<span class="sourceLineNo">237</span>  public Double getSampleValue(String name) {<a name="line.237"></a>
+<span class="sourceLineNo">238</span>    return getSampleValue(name, new String[]{}, new String[]{});<a name="line.238"></a>
+<span class="sourceLineNo">239</span>  }<a name="line.239"></a>
+<span class="sourceLineNo">240</span><a name="line.240"></a>
+<span class="sourceLineNo">241</span>  /**<a name="line.241"></a>
+<span class="sourceLineNo">242</span>   * Returns the given value, or null if it doesn't exist.<a name="line.242"></a>
+<span class="sourceLineNo">243</span>   * &lt;p&gt;<a name="line.243"></a>
+<span class="sourceLineNo">244</span>   * This is inefficient, and intended only for use in unittests.<a name="line.244"></a>
+<span class="sourceLineNo">245</span>   */<a name="line.245"></a>
+<span class="sourceLineNo">246</span>  public Double getSampleValue(String name, String[] labelNames, String[] labelValues) {<a name="line.246"></a>
+<span class="sourceLineNo">247</span>    for (Collector.MetricFamilySamples metricFamilySamples : Collections.list(metricFamilySamples())) {<a name="line.247"></a>
+<span class="sourceLineNo">248</span>      for (Collector.MetricFamilySamples.Sample sample : metricFamilySamples.samples) {<a name="line.248"></a>
+<span class="sourceLineNo">249</span>        if (sample.name.equals(name)<a name="line.249"></a>
+<span class="sourceLineNo">250</span>                &amp;&amp; Arrays.equals(sample.labelNames.toArray(), labelNames)<a name="line.250"></a>
+<span class="sourceLineNo">251</span>                &amp;&amp; Arrays.equals(sample.labelValues.toArray(), labelValues)) {<a name="line.251"></a>
+<span class="sourceLineNo">252</span>          return sample.value;<a name="line.252"></a>
+<span class="sourceLineNo">253</span>        }<a name="line.253"></a>
+<span class="sourceLineNo">254</span>      }<a name="line.254"></a>
+<span class="sourceLineNo">255</span>    }<a name="line.255"></a>
+<span class="sourceLineNo">256</span>    return null;<a name="line.256"></a>
+<span class="sourceLineNo">257</span>  }<a name="line.257"></a>
+<span class="sourceLineNo">258</span><a name="line.258"></a>
+<span class="sourceLineNo">259</span>}<a name="line.259"></a>
 
 
 
