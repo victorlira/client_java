@@ -321,10 +321,10 @@
 <span class="sourceLineNo">313</span>      }<a name="line.313"></a>
 <span class="sourceLineNo">314</span><a name="line.314"></a>
 <span class="sourceLineNo">315</span>      int response = connection.getResponseCode();<a name="line.315"></a>
-<span class="sourceLineNo">316</span>      if (response != HttpURLConnection.HTTP_ACCEPTED) {<a name="line.316"></a>
+<span class="sourceLineNo">316</span>      if (response/100 != 2) {<a name="line.316"></a>
 <span class="sourceLineNo">317</span>        String errorMessage;<a name="line.317"></a>
 <span class="sourceLineNo">318</span>        InputStream errorStream = connection.getErrorStream();<a name="line.318"></a>
-<span class="sourceLineNo">319</span>        if(response &gt;= 400 &amp;&amp; errorStream != null) {<a name="line.319"></a>
+<span class="sourceLineNo">319</span>        if(errorStream != null) {<a name="line.319"></a>
 <span class="sourceLineNo">320</span>          String errBody = readFromStream(errorStream);<a name="line.320"></a>
 <span class="sourceLineNo">321</span>          errorMessage = "Response code from " + url + " was " + response + ", response body: " + errBody;<a name="line.321"></a>
 <span class="sourceLineNo">322</span>        } else {<a name="line.322"></a>
