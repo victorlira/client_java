@@ -1,278 +1,279 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE HTML>
 <html lang="en">
 <head>
 <title>Source code</title>
 <link rel="stylesheet" type="text/css" href="../../../../stylesheet.css" title="Style">
 </head>
 <body>
+<main role="main">
 <div class="sourceContainer">
-<pre><span class="sourceLineNo">001</span>/*<a name="line.1"></a>
-<span class="sourceLineNo">002</span> * Written by Doug Lea with assistance from members of JCP JSR-166<a name="line.2"></a>
-<span class="sourceLineNo">003</span> * Expert Group and released to the public domain, as explained at<a name="line.3"></a>
-<span class="sourceLineNo">004</span> * http://creativecommons.org/publicdomain/zero/1.0/<a name="line.4"></a>
-<span class="sourceLineNo">005</span> *<a name="line.5"></a>
-<span class="sourceLineNo">006</span> * Source: http://gee.cs.oswego.edu/cgi-bin/viewcvs.cgi/jsr166/src/jsr166e/DoubleAdder.java?revision=1.12<a name="line.6"></a>
-<span class="sourceLineNo">007</span> */<a name="line.7"></a>
-<span class="sourceLineNo">008</span><a name="line.8"></a>
-<span class="sourceLineNo">009</span>package io.prometheus.client;<a name="line.9"></a>
-<span class="sourceLineNo">010</span><a name="line.10"></a>
-<span class="sourceLineNo">011</span>import java.io.IOException;<a name="line.11"></a>
-<span class="sourceLineNo">012</span>import java.io.ObjectInputStream;<a name="line.12"></a>
-<span class="sourceLineNo">013</span>import java.io.ObjectOutputStream;<a name="line.13"></a>
-<span class="sourceLineNo">014</span>import java.io.Serializable;<a name="line.14"></a>
-<span class="sourceLineNo">015</span><a name="line.15"></a>
-<span class="sourceLineNo">016</span>/**<a name="line.16"></a>
-<span class="sourceLineNo">017</span> * One or more variables that together maintain an initially zero<a name="line.17"></a>
-<span class="sourceLineNo">018</span> * {@code double} sum.  When updates (method {@link #add}) are<a name="line.18"></a>
-<span class="sourceLineNo">019</span> * contended across threads, the set of variables may grow dynamically<a name="line.19"></a>
-<span class="sourceLineNo">020</span> * to reduce contention.  Method {@link #sum} (or, equivalently {@link<a name="line.20"></a>
-<span class="sourceLineNo">021</span> * #doubleValue}) returns the current total combined across the<a name="line.21"></a>
-<span class="sourceLineNo">022</span> * variables maintaining the sum.<a name="line.22"></a>
-<span class="sourceLineNo">023</span> *<a name="line.23"></a>
-<span class="sourceLineNo">024</span> * &lt;p&gt;This class extends {@link Number}, but does &lt;em&gt;not&lt;/em&gt; define<a name="line.24"></a>
-<span class="sourceLineNo">025</span> * methods such as {@code equals}, {@code hashCode} and {@code<a name="line.25"></a>
-<span class="sourceLineNo">026</span> * compareTo} because instances are expected to be mutated, and so are<a name="line.26"></a>
-<span class="sourceLineNo">027</span> * not useful as collection keys.<a name="line.27"></a>
-<span class="sourceLineNo">028</span> *<a name="line.28"></a>
-<span class="sourceLineNo">029</span> * &lt;p&gt;&lt;em&gt;jsr166e note: This class is targeted to be placed in<a name="line.29"></a>
-<span class="sourceLineNo">030</span> * java.util.concurrent.atomic.&lt;/em&gt;<a name="line.30"></a>
-<span class="sourceLineNo">031</span> *<a name="line.31"></a>
-<span class="sourceLineNo">032</span> * @since 1.8<a name="line.32"></a>
-<span class="sourceLineNo">033</span> * @author Doug Lea<a name="line.33"></a>
-<span class="sourceLineNo">034</span> */<a name="line.34"></a>
-<span class="sourceLineNo">035</span>public class DoubleAdder extends Striped64 implements Serializable {<a name="line.35"></a>
-<span class="sourceLineNo">036</span>    private static final long serialVersionUID = 7249069246863182397L;<a name="line.36"></a>
-<span class="sourceLineNo">037</span><a name="line.37"></a>
-<span class="sourceLineNo">038</span>    /**<a name="line.38"></a>
-<span class="sourceLineNo">039</span>     * Update function. Note that we must use "long" for underlying<a name="line.39"></a>
-<span class="sourceLineNo">040</span>     * representations, because there is no compareAndSet for double,<a name="line.40"></a>
-<span class="sourceLineNo">041</span>     * due to the fact that the bitwise equals used in any CAS<a name="line.41"></a>
-<span class="sourceLineNo">042</span>     * implementation is not the same as double-precision equals.<a name="line.42"></a>
-<span class="sourceLineNo">043</span>     * However, we use CAS only to detect and alleviate contention,<a name="line.43"></a>
-<span class="sourceLineNo">044</span>     * for which bitwise equals works best anyway. In principle, the<a name="line.44"></a>
-<span class="sourceLineNo">045</span>     * long/double conversions used here should be essentially free on<a name="line.45"></a>
-<span class="sourceLineNo">046</span>     * most platforms since they just re-interpret bits.<a name="line.46"></a>
-<span class="sourceLineNo">047</span>     *<a name="line.47"></a>
-<span class="sourceLineNo">048</span>     * Similar conversions are used in other methods.<a name="line.48"></a>
-<span class="sourceLineNo">049</span>     */<a name="line.49"></a>
-<span class="sourceLineNo">050</span>    final long fn(long v, long x) {<a name="line.50"></a>
-<span class="sourceLineNo">051</span>        return Double.doubleToRawLongBits<a name="line.51"></a>
-<span class="sourceLineNo">052</span>                (Double.longBitsToDouble(v) +<a name="line.52"></a>
-<span class="sourceLineNo">053</span>                        Double.longBitsToDouble(x));<a name="line.53"></a>
-<span class="sourceLineNo">054</span>    }<a name="line.54"></a>
-<span class="sourceLineNo">055</span><a name="line.55"></a>
-<span class="sourceLineNo">056</span>    /**<a name="line.56"></a>
-<span class="sourceLineNo">057</span>     * Creates a new adder with initial sum of zero.<a name="line.57"></a>
-<span class="sourceLineNo">058</span>     */<a name="line.58"></a>
-<span class="sourceLineNo">059</span>    public DoubleAdder() {<a name="line.59"></a>
-<span class="sourceLineNo">060</span>    }<a name="line.60"></a>
-<span class="sourceLineNo">061</span><a name="line.61"></a>
-<span class="sourceLineNo">062</span>    /**<a name="line.62"></a>
-<span class="sourceLineNo">063</span>     * Adds the given value.<a name="line.63"></a>
-<span class="sourceLineNo">064</span>     *<a name="line.64"></a>
-<span class="sourceLineNo">065</span>     * @param x the value to add<a name="line.65"></a>
-<span class="sourceLineNo">066</span>     */<a name="line.66"></a>
-<span class="sourceLineNo">067</span>    public void add(double x) {<a name="line.67"></a>
-<span class="sourceLineNo">068</span>        Cell[] as; long b, v; int[] hc; Cell a; int n;<a name="line.68"></a>
-<span class="sourceLineNo">069</span>        if ((as = cells) != null ||<a name="line.69"></a>
-<span class="sourceLineNo">070</span>                !casBase(b = base,<a name="line.70"></a>
-<span class="sourceLineNo">071</span>                        Double.doubleToRawLongBits<a name="line.71"></a>
-<span class="sourceLineNo">072</span>                                (Double.longBitsToDouble(b) + x))) {<a name="line.72"></a>
-<span class="sourceLineNo">073</span>            boolean uncontended = true;<a name="line.73"></a>
-<span class="sourceLineNo">074</span>            if ((hc = threadHashCode.get()) == null ||<a name="line.74"></a>
-<span class="sourceLineNo">075</span>                    as == null || (n = as.length) &lt; 1 ||<a name="line.75"></a>
-<span class="sourceLineNo">076</span>                    (a = as[(n - 1) &amp; hc[0]]) == null ||<a name="line.76"></a>
-<span class="sourceLineNo">077</span>                    !(uncontended = a.cas(v = a.value,<a name="line.77"></a>
-<span class="sourceLineNo">078</span>                            Double.doubleToRawLongBits<a name="line.78"></a>
-<span class="sourceLineNo">079</span>                                    (Double.longBitsToDouble(v) + x))))<a name="line.79"></a>
-<span class="sourceLineNo">080</span>                retryUpdate(Double.doubleToRawLongBits(x), hc, uncontended);<a name="line.80"></a>
-<span class="sourceLineNo">081</span>        }<a name="line.81"></a>
-<span class="sourceLineNo">082</span>    }<a name="line.82"></a>
-<span class="sourceLineNo">083</span><a name="line.83"></a>
-<span class="sourceLineNo">084</span>    /**<a name="line.84"></a>
-<span class="sourceLineNo">085</span>     * Returns the current sum.  The returned value is &lt;em&gt;NOT&lt;/em&gt; an<a name="line.85"></a>
-<span class="sourceLineNo">086</span>     * atomic snapshot; invocation in the absence of concurrent<a name="line.86"></a>
-<span class="sourceLineNo">087</span>     * updates returns an accurate result, but concurrent updates that<a name="line.87"></a>
-<span class="sourceLineNo">088</span>     * occur while the sum is being calculated might not be<a name="line.88"></a>
-<span class="sourceLineNo">089</span>     * incorporated.  Also, because floating-point arithmetic is not<a name="line.89"></a>
-<span class="sourceLineNo">090</span>     * strictly associative, the returned result need not be identical<a name="line.90"></a>
-<span class="sourceLineNo">091</span>     * to the value that would be obtained in a sequential series of<a name="line.91"></a>
-<span class="sourceLineNo">092</span>     * updates to a single variable.<a name="line.92"></a>
-<span class="sourceLineNo">093</span>     *<a name="line.93"></a>
-<span class="sourceLineNo">094</span>     * @return the sum<a name="line.94"></a>
-<span class="sourceLineNo">095</span>     */<a name="line.95"></a>
-<span class="sourceLineNo">096</span>    public double sum() {<a name="line.96"></a>
-<span class="sourceLineNo">097</span>        // On concurrent `sum` and `set`, it is acceptable to `get` an outdated `value`.<a name="line.97"></a>
-<span class="sourceLineNo">098</span>        // On concurrent `sum` and `add`, it is acceptable to `get` an outdated `value`.<a name="line.98"></a>
-<span class="sourceLineNo">099</span>        // On concurrent `sum` and `set` and `add`, it is possible to `get` an outdated `value`.<a name="line.99"></a>
-<span class="sourceLineNo">100</span><a name="line.100"></a>
-<span class="sourceLineNo">101</span>        // Correctness is guaranteed by `volatile` memory access ordering and visibility semantics.<a name="line.101"></a>
-<span class="sourceLineNo">102</span>        // Program order:<a name="line.102"></a>
-<span class="sourceLineNo">103</span>        //  - writes in `set` - `busy` (CAS), `cells` (Wc), `base` (Wb), `busy`<a name="line.103"></a>
-<span class="sourceLineNo">104</span>        //  - reads in `sum` - `cells` (Rc), `base` (Rb), `busy`, `cells` (Cc), `base` (Cb)<a name="line.104"></a>
-<span class="sourceLineNo">105</span>        // Note that:<a name="line.105"></a>
-<span class="sourceLineNo">106</span>        //  - `busy` is written after `cells` and `base`<a name="line.106"></a>
-<span class="sourceLineNo">107</span>        //  - `busy` is read after `cells` and `base`, then `cells` and `base` is re-read after `busy`<a name="line.107"></a>
-<span class="sourceLineNo">108</span>        // In other words:<a name="line.108"></a>
-<span class="sourceLineNo">109</span>        //  - if we see the write to `busy`, then we must see the write to `cells` and `busy` on re-read<a name="line.109"></a>
-<span class="sourceLineNo">110</span>        //  - if we don't see the write to `busy`, then we must retry as we have no guarantees<a name="line.110"></a>
-<span class="sourceLineNo">111</span>        // Execution order (in the former case):<a name="line.111"></a>
-<span class="sourceLineNo">112</span>        //  - serial<a name="line.112"></a>
-<span class="sourceLineNo">113</span>        //    - old result - Rc, Rb, Cc, Cb, Wc, Wb<a name="line.113"></a>
-<span class="sourceLineNo">114</span>        //    - new result - Wc, Wb, Rc, Rb, Cc, Cb<a name="line.114"></a>
-<span class="sourceLineNo">115</span>        //  - concurrent<a name="line.115"></a>
-<span class="sourceLineNo">116</span>        //    - old result - Rc, Wc, Rb, Wb, Cc, Cb - retry (superfluous)<a name="line.116"></a>
-<span class="sourceLineNo">117</span>        //    - new result - Wc, Rc, Wb, Rb, Cc, Cb<a name="line.117"></a>
-<span class="sourceLineNo">118</span>        //    - invalid result - Rc, Wc, Wb, Rb, Cc, Cb - retry<a name="line.118"></a>
-<span class="sourceLineNo">119</span>        //    - invalid result - Wc, Rc, Rb, Wb, Cc, Cb - retry<a name="line.119"></a>
-<span class="sourceLineNo">120</span>        Cell[] as = cells; long b = base;<a name="line.120"></a>
-<span class="sourceLineNo">121</span>        while (as != null &amp;&amp; !(busy == 0 &amp;&amp; cells == as &amp;&amp; base == b)) {<a name="line.121"></a>
-<span class="sourceLineNo">122</span>            // busy waiting, retry loop<a name="line.122"></a>
-<span class="sourceLineNo">123</span>            Thread.yield();<a name="line.123"></a>
-<span class="sourceLineNo">124</span>            as = cells; b = base;<a name="line.124"></a>
-<span class="sourceLineNo">125</span>        }<a name="line.125"></a>
-<span class="sourceLineNo">126</span><a name="line.126"></a>
-<span class="sourceLineNo">127</span>        double sum = Double.longBitsToDouble(b);<a name="line.127"></a>
-<span class="sourceLineNo">128</span>        if (as != null) {<a name="line.128"></a>
-<span class="sourceLineNo">129</span>            int n = as.length;<a name="line.129"></a>
-<span class="sourceLineNo">130</span>            for (int i = 0; i &lt; n; ++i) {<a name="line.130"></a>
-<span class="sourceLineNo">131</span>                Cell a = as[i];<a name="line.131"></a>
-<span class="sourceLineNo">132</span>                if (a != null)<a name="line.132"></a>
-<span class="sourceLineNo">133</span>                    sum += Double.longBitsToDouble(a.value);<a name="line.133"></a>
-<span class="sourceLineNo">134</span>            }<a name="line.134"></a>
-<span class="sourceLineNo">135</span>        }<a name="line.135"></a>
-<span class="sourceLineNo">136</span>        return sum;<a name="line.136"></a>
-<span class="sourceLineNo">137</span>    }<a name="line.137"></a>
-<span class="sourceLineNo">138</span><a name="line.138"></a>
-<span class="sourceLineNo">139</span>    /**<a name="line.139"></a>
-<span class="sourceLineNo">140</span>     * Resets variables maintaining the sum to zero.  This method may<a name="line.140"></a>
-<span class="sourceLineNo">141</span>     * be a useful alternative to creating a new adder, but is only<a name="line.141"></a>
-<span class="sourceLineNo">142</span>     * effective if there are no concurrent updates.  Because this<a name="line.142"></a>
-<span class="sourceLineNo">143</span>     * method is intrinsically racy, it should only be used when it is<a name="line.143"></a>
-<span class="sourceLineNo">144</span>     * known that no threads are concurrently updating.<a name="line.144"></a>
-<span class="sourceLineNo">145</span>     */<a name="line.145"></a>
-<span class="sourceLineNo">146</span>    public void reset() {<a name="line.146"></a>
-<span class="sourceLineNo">147</span>        internalReset(0L);<a name="line.147"></a>
-<span class="sourceLineNo">148</span>    }<a name="line.148"></a>
-<span class="sourceLineNo">149</span><a name="line.149"></a>
-<span class="sourceLineNo">150</span>    public void set(double x) {<a name="line.150"></a>
-<span class="sourceLineNo">151</span>        // On concurrent `set` and `set`, it should be acceptable to lose one `set` measurement.<a name="line.151"></a>
-<span class="sourceLineNo">152</span>        // On concurrent `set` and `add`, it should be acceptable to lose the `add` measurement.<a name="line.152"></a>
-<span class="sourceLineNo">153</span><a name="line.153"></a>
-<span class="sourceLineNo">154</span>        // Correctness is ensured by different techniques:<a name="line.154"></a>
-<span class="sourceLineNo">155</span>        //  - `set` waits on contention (blocking)<a name="line.155"></a>
-<span class="sourceLineNo">156</span>        //  - `add` avoids contention (non-blocking)<a name="line.156"></a>
-<span class="sourceLineNo">157</span>        //  - `sum` retries on conflicts (non-blocking)<a name="line.157"></a>
-<span class="sourceLineNo">158</span>        // Performance characteristics by use cases:<a name="line.158"></a>
-<span class="sourceLineNo">159</span>        //  - only `set` - `cells` is always `null` - no allocations<a name="line.159"></a>
-<span class="sourceLineNo">160</span>        //  - only `add` - `cells` allocated on contention<a name="line.160"></a>
-<span class="sourceLineNo">161</span>        //  - mixed `set` and `add` - `cells` allocated on contention, `cells` deallocated on `set`<a name="line.161"></a>
-<span class="sourceLineNo">162</span>        for (;;) {<a name="line.162"></a>
-<span class="sourceLineNo">163</span>            Cell[] as;<a name="line.163"></a>
-<span class="sourceLineNo">164</span>            if ((as = cells) != null) { // have cells<a name="line.164"></a>
-<span class="sourceLineNo">165</span>                if (busy == 0 &amp;&amp; casBusy()) {<a name="line.165"></a>
-<span class="sourceLineNo">166</span>                    try {<a name="line.166"></a>
-<span class="sourceLineNo">167</span>                        if (cells == as) { // recheck under lock<a name="line.167"></a>
-<span class="sourceLineNo">168</span>                            // update cells and base (not atomic)<a name="line.168"></a>
-<span class="sourceLineNo">169</span>                            cells = null;<a name="line.169"></a>
-<span class="sourceLineNo">170</span>                            base = Double.doubleToLongBits(x);<a name="line.170"></a>
-<span class="sourceLineNo">171</span>                            break;<a name="line.171"></a>
-<span class="sourceLineNo">172</span>                        }<a name="line.172"></a>
-<span class="sourceLineNo">173</span>                    } finally {<a name="line.173"></a>
-<span class="sourceLineNo">174</span>                        busy = 0;<a name="line.174"></a>
-<span class="sourceLineNo">175</span>                    }<a name="line.175"></a>
-<span class="sourceLineNo">176</span>                }<a name="line.176"></a>
-<span class="sourceLineNo">177</span>            } else { // no cells<a name="line.177"></a>
-<span class="sourceLineNo">178</span>                // update base (atomic)<a name="line.178"></a>
-<span class="sourceLineNo">179</span>                base = Double.doubleToLongBits(x);<a name="line.179"></a>
-<span class="sourceLineNo">180</span>                break;<a name="line.180"></a>
-<span class="sourceLineNo">181</span>            }<a name="line.181"></a>
-<span class="sourceLineNo">182</span>        }<a name="line.182"></a>
-<span class="sourceLineNo">183</span>    }<a name="line.183"></a>
-<span class="sourceLineNo">184</span><a name="line.184"></a>
-<span class="sourceLineNo">185</span>    /**<a name="line.185"></a>
-<span class="sourceLineNo">186</span>     * Equivalent in effect to {@link #sum} followed by {@link<a name="line.186"></a>
-<span class="sourceLineNo">187</span>     * #reset}. This method may apply for example during quiescent<a name="line.187"></a>
-<span class="sourceLineNo">188</span>     * points between multithreaded computations.  If there are<a name="line.188"></a>
-<span class="sourceLineNo">189</span>     * updates concurrent with this method, the returned value is<a name="line.189"></a>
-<span class="sourceLineNo">190</span>     * &lt;em&gt;not&lt;/em&gt; guaranteed to be the final value occurring before<a name="line.190"></a>
-<span class="sourceLineNo">191</span>     * the reset.<a name="line.191"></a>
-<span class="sourceLineNo">192</span>     *<a name="line.192"></a>
-<span class="sourceLineNo">193</span>     * @return the sum<a name="line.193"></a>
-<span class="sourceLineNo">194</span>     */<a name="line.194"></a>
-<span class="sourceLineNo">195</span>    public double sumThenReset() {<a name="line.195"></a>
-<span class="sourceLineNo">196</span>        Cell[] as = cells;<a name="line.196"></a>
-<span class="sourceLineNo">197</span>        double sum = Double.longBitsToDouble(base);<a name="line.197"></a>
-<span class="sourceLineNo">198</span>        base = 0L;<a name="line.198"></a>
-<span class="sourceLineNo">199</span>        if (as != null) {<a name="line.199"></a>
-<span class="sourceLineNo">200</span>            int n = as.length;<a name="line.200"></a>
-<span class="sourceLineNo">201</span>            for (int i = 0; i &lt; n; ++i) {<a name="line.201"></a>
-<span class="sourceLineNo">202</span>                Cell a = as[i];<a name="line.202"></a>
-<span class="sourceLineNo">203</span>                if (a != null) {<a name="line.203"></a>
-<span class="sourceLineNo">204</span>                    long v = a.value;<a name="line.204"></a>
-<span class="sourceLineNo">205</span>                    a.value = 0L;<a name="line.205"></a>
-<span class="sourceLineNo">206</span>                    sum += Double.longBitsToDouble(v);<a name="line.206"></a>
-<span class="sourceLineNo">207</span>                }<a name="line.207"></a>
-<span class="sourceLineNo">208</span>            }<a name="line.208"></a>
-<span class="sourceLineNo">209</span>        }<a name="line.209"></a>
-<span class="sourceLineNo">210</span>        return sum;<a name="line.210"></a>
-<span class="sourceLineNo">211</span>    }<a name="line.211"></a>
-<span class="sourceLineNo">212</span><a name="line.212"></a>
-<span class="sourceLineNo">213</span>    /**<a name="line.213"></a>
-<span class="sourceLineNo">214</span>     * Returns the String representation of the {@link #sum}.<a name="line.214"></a>
-<span class="sourceLineNo">215</span>     * @return the String representation of the {@link #sum}<a name="line.215"></a>
-<span class="sourceLineNo">216</span>     */<a name="line.216"></a>
-<span class="sourceLineNo">217</span>    public String toString() {<a name="line.217"></a>
-<span class="sourceLineNo">218</span>        return Double.toString(sum());<a name="line.218"></a>
-<span class="sourceLineNo">219</span>    }<a name="line.219"></a>
-<span class="sourceLineNo">220</span><a name="line.220"></a>
-<span class="sourceLineNo">221</span>    /**<a name="line.221"></a>
-<span class="sourceLineNo">222</span>     * Equivalent to {@link #sum}.<a name="line.222"></a>
-<span class="sourceLineNo">223</span>     *<a name="line.223"></a>
-<span class="sourceLineNo">224</span>     * @return the sum<a name="line.224"></a>
-<span class="sourceLineNo">225</span>     */<a name="line.225"></a>
-<span class="sourceLineNo">226</span>    public double doubleValue() {<a name="line.226"></a>
-<span class="sourceLineNo">227</span>        return sum();<a name="line.227"></a>
-<span class="sourceLineNo">228</span>    }<a name="line.228"></a>
-<span class="sourceLineNo">229</span><a name="line.229"></a>
-<span class="sourceLineNo">230</span>    /**<a name="line.230"></a>
-<span class="sourceLineNo">231</span>     * Returns the {@link #sum} as a {@code long} after a<a name="line.231"></a>
-<span class="sourceLineNo">232</span>     * narrowing primitive conversion.<a name="line.232"></a>
-<span class="sourceLineNo">233</span>     */<a name="line.233"></a>
-<span class="sourceLineNo">234</span>    public long longValue() {<a name="line.234"></a>
-<span class="sourceLineNo">235</span>        return (long)sum();<a name="line.235"></a>
-<span class="sourceLineNo">236</span>    }<a name="line.236"></a>
-<span class="sourceLineNo">237</span><a name="line.237"></a>
-<span class="sourceLineNo">238</span>    /**<a name="line.238"></a>
-<span class="sourceLineNo">239</span>     * Returns the {@link #sum} as an {@code int} after a<a name="line.239"></a>
-<span class="sourceLineNo">240</span>     * narrowing primitive conversion.<a name="line.240"></a>
-<span class="sourceLineNo">241</span>     */<a name="line.241"></a>
-<span class="sourceLineNo">242</span>    public int intValue() {<a name="line.242"></a>
-<span class="sourceLineNo">243</span>        return (int)sum();<a name="line.243"></a>
-<span class="sourceLineNo">244</span>    }<a name="line.244"></a>
-<span class="sourceLineNo">245</span><a name="line.245"></a>
-<span class="sourceLineNo">246</span>    /**<a name="line.246"></a>
-<span class="sourceLineNo">247</span>     * Returns the {@link #sum} as a {@code float}<a name="line.247"></a>
-<span class="sourceLineNo">248</span>     * after a narrowing primitive conversion.<a name="line.248"></a>
-<span class="sourceLineNo">249</span>     */<a name="line.249"></a>
-<span class="sourceLineNo">250</span>    public float floatValue() {<a name="line.250"></a>
-<span class="sourceLineNo">251</span>        return (float)sum();<a name="line.251"></a>
-<span class="sourceLineNo">252</span>    }<a name="line.252"></a>
-<span class="sourceLineNo">253</span><a name="line.253"></a>
-<span class="sourceLineNo">254</span>    private void writeObject(ObjectOutputStream s) throws IOException {<a name="line.254"></a>
-<span class="sourceLineNo">255</span>        s.defaultWriteObject();<a name="line.255"></a>
-<span class="sourceLineNo">256</span>        s.writeDouble(sum());<a name="line.256"></a>
-<span class="sourceLineNo">257</span>    }<a name="line.257"></a>
-<span class="sourceLineNo">258</span><a name="line.258"></a>
-<span class="sourceLineNo">259</span>    private void readObject(ObjectInputStream s)<a name="line.259"></a>
-<span class="sourceLineNo">260</span>            throws IOException, ClassNotFoundException {<a name="line.260"></a>
-<span class="sourceLineNo">261</span>        s.defaultReadObject();<a name="line.261"></a>
-<span class="sourceLineNo">262</span>        busy = 0;<a name="line.262"></a>
-<span class="sourceLineNo">263</span>        cells = null;<a name="line.263"></a>
-<span class="sourceLineNo">264</span>        base = Double.doubleToRawLongBits(s.readDouble());<a name="line.264"></a>
-<span class="sourceLineNo">265</span>    }<a name="line.265"></a>
-<span class="sourceLineNo">266</span><a name="line.266"></a>
-<span class="sourceLineNo">267</span>}<a name="line.267"></a>
+<pre><span class="sourceLineNo">001</span><a id="line.1">/*</a>
+<span class="sourceLineNo">002</span><a id="line.2"> * Written by Doug Lea with assistance from members of JCP JSR-166</a>
+<span class="sourceLineNo">003</span><a id="line.3"> * Expert Group and released to the public domain, as explained at</a>
+<span class="sourceLineNo">004</span><a id="line.4"> * http://creativecommons.org/publicdomain/zero/1.0/</a>
+<span class="sourceLineNo">005</span><a id="line.5"> *</a>
+<span class="sourceLineNo">006</span><a id="line.6"> * Source: http://gee.cs.oswego.edu/cgi-bin/viewcvs.cgi/jsr166/src/jsr166e/DoubleAdder.java?revision=1.12</a>
+<span class="sourceLineNo">007</span><a id="line.7"> */</a>
+<span class="sourceLineNo">008</span><a id="line.8"></a>
+<span class="sourceLineNo">009</span><a id="line.9">package io.prometheus.client;</a>
+<span class="sourceLineNo">010</span><a id="line.10"></a>
+<span class="sourceLineNo">011</span><a id="line.11">import java.io.IOException;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import java.io.ObjectInputStream;</a>
+<span class="sourceLineNo">013</span><a id="line.13">import java.io.ObjectOutputStream;</a>
+<span class="sourceLineNo">014</span><a id="line.14">import java.io.Serializable;</a>
+<span class="sourceLineNo">015</span><a id="line.15"></a>
+<span class="sourceLineNo">016</span><a id="line.16">/**</a>
+<span class="sourceLineNo">017</span><a id="line.17"> * One or more variables that together maintain an initially zero</a>
+<span class="sourceLineNo">018</span><a id="line.18"> * {@code double} sum.  When updates (method {@link #add}) are</a>
+<span class="sourceLineNo">019</span><a id="line.19"> * contended across threads, the set of variables may grow dynamically</a>
+<span class="sourceLineNo">020</span><a id="line.20"> * to reduce contention.  Method {@link #sum} (or, equivalently {@link</a>
+<span class="sourceLineNo">021</span><a id="line.21"> * #doubleValue}) returns the current total combined across the</a>
+<span class="sourceLineNo">022</span><a id="line.22"> * variables maintaining the sum.</a>
+<span class="sourceLineNo">023</span><a id="line.23"> *</a>
+<span class="sourceLineNo">024</span><a id="line.24"> * &lt;p&gt;This class extends {@link Number}, but does &lt;em&gt;not&lt;/em&gt; define</a>
+<span class="sourceLineNo">025</span><a id="line.25"> * methods such as {@code equals}, {@code hashCode} and {@code</a>
+<span class="sourceLineNo">026</span><a id="line.26"> * compareTo} because instances are expected to be mutated, and so are</a>
+<span class="sourceLineNo">027</span><a id="line.27"> * not useful as collection keys.</a>
+<span class="sourceLineNo">028</span><a id="line.28"> *</a>
+<span class="sourceLineNo">029</span><a id="line.29"> * &lt;p&gt;&lt;em&gt;jsr166e note: This class is targeted to be placed in</a>
+<span class="sourceLineNo">030</span><a id="line.30"> * java.util.concurrent.atomic.&lt;/em&gt;</a>
+<span class="sourceLineNo">031</span><a id="line.31"> *</a>
+<span class="sourceLineNo">032</span><a id="line.32"> * @since 1.8</a>
+<span class="sourceLineNo">033</span><a id="line.33"> * @author Doug Lea</a>
+<span class="sourceLineNo">034</span><a id="line.34"> */</a>
+<span class="sourceLineNo">035</span><a id="line.35">public class DoubleAdder extends Striped64 implements Serializable {</a>
+<span class="sourceLineNo">036</span><a id="line.36">    private static final long serialVersionUID = 7249069246863182397L;</a>
+<span class="sourceLineNo">037</span><a id="line.37"></a>
+<span class="sourceLineNo">038</span><a id="line.38">    /**</a>
+<span class="sourceLineNo">039</span><a id="line.39">     * Update function. Note that we must use "long" for underlying</a>
+<span class="sourceLineNo">040</span><a id="line.40">     * representations, because there is no compareAndSet for double,</a>
+<span class="sourceLineNo">041</span><a id="line.41">     * due to the fact that the bitwise equals used in any CAS</a>
+<span class="sourceLineNo">042</span><a id="line.42">     * implementation is not the same as double-precision equals.</a>
+<span class="sourceLineNo">043</span><a id="line.43">     * However, we use CAS only to detect and alleviate contention,</a>
+<span class="sourceLineNo">044</span><a id="line.44">     * for which bitwise equals works best anyway. In principle, the</a>
+<span class="sourceLineNo">045</span><a id="line.45">     * long/double conversions used here should be essentially free on</a>
+<span class="sourceLineNo">046</span><a id="line.46">     * most platforms since they just re-interpret bits.</a>
+<span class="sourceLineNo">047</span><a id="line.47">     *</a>
+<span class="sourceLineNo">048</span><a id="line.48">     * Similar conversions are used in other methods.</a>
+<span class="sourceLineNo">049</span><a id="line.49">     */</a>
+<span class="sourceLineNo">050</span><a id="line.50">    final long fn(long v, long x) {</a>
+<span class="sourceLineNo">051</span><a id="line.51">        return Double.doubleToRawLongBits</a>
+<span class="sourceLineNo">052</span><a id="line.52">                (Double.longBitsToDouble(v) +</a>
+<span class="sourceLineNo">053</span><a id="line.53">                        Double.longBitsToDouble(x));</a>
+<span class="sourceLineNo">054</span><a id="line.54">    }</a>
+<span class="sourceLineNo">055</span><a id="line.55"></a>
+<span class="sourceLineNo">056</span><a id="line.56">    /**</a>
+<span class="sourceLineNo">057</span><a id="line.57">     * Creates a new adder with initial sum of zero.</a>
+<span class="sourceLineNo">058</span><a id="line.58">     */</a>
+<span class="sourceLineNo">059</span><a id="line.59">    public DoubleAdder() {</a>
+<span class="sourceLineNo">060</span><a id="line.60">    }</a>
+<span class="sourceLineNo">061</span><a id="line.61"></a>
+<span class="sourceLineNo">062</span><a id="line.62">    /**</a>
+<span class="sourceLineNo">063</span><a id="line.63">     * Adds the given value.</a>
+<span class="sourceLineNo">064</span><a id="line.64">     *</a>
+<span class="sourceLineNo">065</span><a id="line.65">     * @param x the value to add</a>
+<span class="sourceLineNo">066</span><a id="line.66">     */</a>
+<span class="sourceLineNo">067</span><a id="line.67">    public void add(double x) {</a>
+<span class="sourceLineNo">068</span><a id="line.68">        Cell[] as; long b, v; int[] hc; Cell a; int n;</a>
+<span class="sourceLineNo">069</span><a id="line.69">        if ((as = cells) != null ||</a>
+<span class="sourceLineNo">070</span><a id="line.70">                !casBase(b = base,</a>
+<span class="sourceLineNo">071</span><a id="line.71">                        Double.doubleToRawLongBits</a>
+<span class="sourceLineNo">072</span><a id="line.72">                                (Double.longBitsToDouble(b) + x))) {</a>
+<span class="sourceLineNo">073</span><a id="line.73">            boolean uncontended = true;</a>
+<span class="sourceLineNo">074</span><a id="line.74">            if ((hc = threadHashCode.get()) == null ||</a>
+<span class="sourceLineNo">075</span><a id="line.75">                    as == null || (n = as.length) &lt; 1 ||</a>
+<span class="sourceLineNo">076</span><a id="line.76">                    (a = as[(n - 1) &amp; hc[0]]) == null ||</a>
+<span class="sourceLineNo">077</span><a id="line.77">                    !(uncontended = a.cas(v = a.value,</a>
+<span class="sourceLineNo">078</span><a id="line.78">                            Double.doubleToRawLongBits</a>
+<span class="sourceLineNo">079</span><a id="line.79">                                    (Double.longBitsToDouble(v) + x))))</a>
+<span class="sourceLineNo">080</span><a id="line.80">                retryUpdate(Double.doubleToRawLongBits(x), hc, uncontended);</a>
+<span class="sourceLineNo">081</span><a id="line.81">        }</a>
+<span class="sourceLineNo">082</span><a id="line.82">    }</a>
+<span class="sourceLineNo">083</span><a id="line.83"></a>
+<span class="sourceLineNo">084</span><a id="line.84">    /**</a>
+<span class="sourceLineNo">085</span><a id="line.85">     * Returns the current sum.  The returned value is &lt;em&gt;NOT&lt;/em&gt; an</a>
+<span class="sourceLineNo">086</span><a id="line.86">     * atomic snapshot; invocation in the absence of concurrent</a>
+<span class="sourceLineNo">087</span><a id="line.87">     * updates returns an accurate result, but concurrent updates that</a>
+<span class="sourceLineNo">088</span><a id="line.88">     * occur while the sum is being calculated might not be</a>
+<span class="sourceLineNo">089</span><a id="line.89">     * incorporated.  Also, because floating-point arithmetic is not</a>
+<span class="sourceLineNo">090</span><a id="line.90">     * strictly associative, the returned result need not be identical</a>
+<span class="sourceLineNo">091</span><a id="line.91">     * to the value that would be obtained in a sequential series of</a>
+<span class="sourceLineNo">092</span><a id="line.92">     * updates to a single variable.</a>
+<span class="sourceLineNo">093</span><a id="line.93">     *</a>
+<span class="sourceLineNo">094</span><a id="line.94">     * @return the sum</a>
+<span class="sourceLineNo">095</span><a id="line.95">     */</a>
+<span class="sourceLineNo">096</span><a id="line.96">    public double sum() {</a>
+<span class="sourceLineNo">097</span><a id="line.97">        // On concurrent `sum` and `set`, it is acceptable to `get` an outdated `value`.</a>
+<span class="sourceLineNo">098</span><a id="line.98">        // On concurrent `sum` and `add`, it is acceptable to `get` an outdated `value`.</a>
+<span class="sourceLineNo">099</span><a id="line.99">        // On concurrent `sum` and `set` and `add`, it is possible to `get` an outdated `value`.</a>
+<span class="sourceLineNo">100</span><a id="line.100"></a>
+<span class="sourceLineNo">101</span><a id="line.101">        // Correctness is guaranteed by `volatile` memory access ordering and visibility semantics.</a>
+<span class="sourceLineNo">102</span><a id="line.102">        // Program order:</a>
+<span class="sourceLineNo">103</span><a id="line.103">        //  - writes in `set` - `busy` (CAS), `cells` (Wc), `base` (Wb), `busy`</a>
+<span class="sourceLineNo">104</span><a id="line.104">        //  - reads in `sum` - `cells` (Rc), `base` (Rb), `busy`, `cells` (Cc), `base` (Cb)</a>
+<span class="sourceLineNo">105</span><a id="line.105">        // Note that:</a>
+<span class="sourceLineNo">106</span><a id="line.106">        //  - `busy` is written after `cells` and `base`</a>
+<span class="sourceLineNo">107</span><a id="line.107">        //  - `busy` is read after `cells` and `base`, then `cells` and `base` is re-read after `busy`</a>
+<span class="sourceLineNo">108</span><a id="line.108">        // In other words:</a>
+<span class="sourceLineNo">109</span><a id="line.109">        //  - if we see the write to `busy`, then we must see the write to `cells` and `busy` on re-read</a>
+<span class="sourceLineNo">110</span><a id="line.110">        //  - if we don't see the write to `busy`, then we must retry as we have no guarantees</a>
+<span class="sourceLineNo">111</span><a id="line.111">        // Execution order (in the former case):</a>
+<span class="sourceLineNo">112</span><a id="line.112">        //  - serial</a>
+<span class="sourceLineNo">113</span><a id="line.113">        //    - old result - Rc, Rb, Cc, Cb, Wc, Wb</a>
+<span class="sourceLineNo">114</span><a id="line.114">        //    - new result - Wc, Wb, Rc, Rb, Cc, Cb</a>
+<span class="sourceLineNo">115</span><a id="line.115">        //  - concurrent</a>
+<span class="sourceLineNo">116</span><a id="line.116">        //    - old result - Rc, Wc, Rb, Wb, Cc, Cb - retry (superfluous)</a>
+<span class="sourceLineNo">117</span><a id="line.117">        //    - new result - Wc, Rc, Wb, Rb, Cc, Cb</a>
+<span class="sourceLineNo">118</span><a id="line.118">        //    - invalid result - Rc, Wc, Wb, Rb, Cc, Cb - retry</a>
+<span class="sourceLineNo">119</span><a id="line.119">        //    - invalid result - Wc, Rc, Rb, Wb, Cc, Cb - retry</a>
+<span class="sourceLineNo">120</span><a id="line.120">        Cell[] as = cells; long b = base;</a>
+<span class="sourceLineNo">121</span><a id="line.121">        while (as != null &amp;&amp; !(busy == 0 &amp;&amp; cells == as &amp;&amp; base == b)) {</a>
+<span class="sourceLineNo">122</span><a id="line.122">            // busy waiting, retry loop</a>
+<span class="sourceLineNo">123</span><a id="line.123">            Thread.yield();</a>
+<span class="sourceLineNo">124</span><a id="line.124">            as = cells; b = base;</a>
+<span class="sourceLineNo">125</span><a id="line.125">        }</a>
+<span class="sourceLineNo">126</span><a id="line.126"></a>
+<span class="sourceLineNo">127</span><a id="line.127">        double sum = Double.longBitsToDouble(b);</a>
+<span class="sourceLineNo">128</span><a id="line.128">        if (as != null) {</a>
+<span class="sourceLineNo">129</span><a id="line.129">            int n = as.length;</a>
+<span class="sourceLineNo">130</span><a id="line.130">            for (int i = 0; i &lt; n; ++i) {</a>
+<span class="sourceLineNo">131</span><a id="line.131">                Cell a = as[i];</a>
+<span class="sourceLineNo">132</span><a id="line.132">                if (a != null)</a>
+<span class="sourceLineNo">133</span><a id="line.133">                    sum += Double.longBitsToDouble(a.value);</a>
+<span class="sourceLineNo">134</span><a id="line.134">            }</a>
+<span class="sourceLineNo">135</span><a id="line.135">        }</a>
+<span class="sourceLineNo">136</span><a id="line.136">        return sum;</a>
+<span class="sourceLineNo">137</span><a id="line.137">    }</a>
+<span class="sourceLineNo">138</span><a id="line.138"></a>
+<span class="sourceLineNo">139</span><a id="line.139">    /**</a>
+<span class="sourceLineNo">140</span><a id="line.140">     * Resets variables maintaining the sum to zero.  This method may</a>
+<span class="sourceLineNo">141</span><a id="line.141">     * be a useful alternative to creating a new adder, but is only</a>
+<span class="sourceLineNo">142</span><a id="line.142">     * effective if there are no concurrent updates.  Because this</a>
+<span class="sourceLineNo">143</span><a id="line.143">     * method is intrinsically racy, it should only be used when it is</a>
+<span class="sourceLineNo">144</span><a id="line.144">     * known that no threads are concurrently updating.</a>
+<span class="sourceLineNo">145</span><a id="line.145">     */</a>
+<span class="sourceLineNo">146</span><a id="line.146">    public void reset() {</a>
+<span class="sourceLineNo">147</span><a id="line.147">        internalReset(0L);</a>
+<span class="sourceLineNo">148</span><a id="line.148">    }</a>
+<span class="sourceLineNo">149</span><a id="line.149"></a>
+<span class="sourceLineNo">150</span><a id="line.150">    public void set(double x) {</a>
+<span class="sourceLineNo">151</span><a id="line.151">        // On concurrent `set` and `set`, it should be acceptable to lose one `set` measurement.</a>
+<span class="sourceLineNo">152</span><a id="line.152">        // On concurrent `set` and `add`, it should be acceptable to lose the `add` measurement.</a>
+<span class="sourceLineNo">153</span><a id="line.153"></a>
+<span class="sourceLineNo">154</span><a id="line.154">        // Correctness is ensured by different techniques:</a>
+<span class="sourceLineNo">155</span><a id="line.155">        //  - `set` waits on contention (blocking)</a>
+<span class="sourceLineNo">156</span><a id="line.156">        //  - `add` avoids contention (non-blocking)</a>
+<span class="sourceLineNo">157</span><a id="line.157">        //  - `sum` retries on conflicts (non-blocking)</a>
+<span class="sourceLineNo">158</span><a id="line.158">        // Performance characteristics by use cases:</a>
+<span class="sourceLineNo">159</span><a id="line.159">        //  - only `set` - `cells` is always `null` - no allocations</a>
+<span class="sourceLineNo">160</span><a id="line.160">        //  - only `add` - `cells` allocated on contention</a>
+<span class="sourceLineNo">161</span><a id="line.161">        //  - mixed `set` and `add` - `cells` allocated on contention, `cells` deallocated on `set`</a>
+<span class="sourceLineNo">162</span><a id="line.162">        for (;;) {</a>
+<span class="sourceLineNo">163</span><a id="line.163">            Cell[] as;</a>
+<span class="sourceLineNo">164</span><a id="line.164">            if ((as = cells) != null) { // have cells</a>
+<span class="sourceLineNo">165</span><a id="line.165">                if (busy == 0 &amp;&amp; casBusy()) {</a>
+<span class="sourceLineNo">166</span><a id="line.166">                    try {</a>
+<span class="sourceLineNo">167</span><a id="line.167">                        if (cells == as) { // recheck under lock</a>
+<span class="sourceLineNo">168</span><a id="line.168">                            // update cells and base (not atomic)</a>
+<span class="sourceLineNo">169</span><a id="line.169">                            cells = null;</a>
+<span class="sourceLineNo">170</span><a id="line.170">                            base = Double.doubleToLongBits(x);</a>
+<span class="sourceLineNo">171</span><a id="line.171">                            break;</a>
+<span class="sourceLineNo">172</span><a id="line.172">                        }</a>
+<span class="sourceLineNo">173</span><a id="line.173">                    } finally {</a>
+<span class="sourceLineNo">174</span><a id="line.174">                        busy = 0;</a>
+<span class="sourceLineNo">175</span><a id="line.175">                    }</a>
+<span class="sourceLineNo">176</span><a id="line.176">                }</a>
+<span class="sourceLineNo">177</span><a id="line.177">            } else { // no cells</a>
+<span class="sourceLineNo">178</span><a id="line.178">                // update base (atomic)</a>
+<span class="sourceLineNo">179</span><a id="line.179">                base = Double.doubleToLongBits(x);</a>
+<span class="sourceLineNo">180</span><a id="line.180">                break;</a>
+<span class="sourceLineNo">181</span><a id="line.181">            }</a>
+<span class="sourceLineNo">182</span><a id="line.182">        }</a>
+<span class="sourceLineNo">183</span><a id="line.183">    }</a>
+<span class="sourceLineNo">184</span><a id="line.184"></a>
+<span class="sourceLineNo">185</span><a id="line.185">    /**</a>
+<span class="sourceLineNo">186</span><a id="line.186">     * Equivalent in effect to {@link #sum} followed by {@link</a>
+<span class="sourceLineNo">187</span><a id="line.187">     * #reset}. This method may apply for example during quiescent</a>
+<span class="sourceLineNo">188</span><a id="line.188">     * points between multithreaded computations.  If there are</a>
+<span class="sourceLineNo">189</span><a id="line.189">     * updates concurrent with this method, the returned value is</a>
+<span class="sourceLineNo">190</span><a id="line.190">     * &lt;em&gt;not&lt;/em&gt; guaranteed to be the final value occurring before</a>
+<span class="sourceLineNo">191</span><a id="line.191">     * the reset.</a>
+<span class="sourceLineNo">192</span><a id="line.192">     *</a>
+<span class="sourceLineNo">193</span><a id="line.193">     * @return the sum</a>
+<span class="sourceLineNo">194</span><a id="line.194">     */</a>
+<span class="sourceLineNo">195</span><a id="line.195">    public double sumThenReset() {</a>
+<span class="sourceLineNo">196</span><a id="line.196">        Cell[] as = cells;</a>
+<span class="sourceLineNo">197</span><a id="line.197">        double sum = Double.longBitsToDouble(base);</a>
+<span class="sourceLineNo">198</span><a id="line.198">        base = 0L;</a>
+<span class="sourceLineNo">199</span><a id="line.199">        if (as != null) {</a>
+<span class="sourceLineNo">200</span><a id="line.200">            int n = as.length;</a>
+<span class="sourceLineNo">201</span><a id="line.201">            for (int i = 0; i &lt; n; ++i) {</a>
+<span class="sourceLineNo">202</span><a id="line.202">                Cell a = as[i];</a>
+<span class="sourceLineNo">203</span><a id="line.203">                if (a != null) {</a>
+<span class="sourceLineNo">204</span><a id="line.204">                    long v = a.value;</a>
+<span class="sourceLineNo">205</span><a id="line.205">                    a.value = 0L;</a>
+<span class="sourceLineNo">206</span><a id="line.206">                    sum += Double.longBitsToDouble(v);</a>
+<span class="sourceLineNo">207</span><a id="line.207">                }</a>
+<span class="sourceLineNo">208</span><a id="line.208">            }</a>
+<span class="sourceLineNo">209</span><a id="line.209">        }</a>
+<span class="sourceLineNo">210</span><a id="line.210">        return sum;</a>
+<span class="sourceLineNo">211</span><a id="line.211">    }</a>
+<span class="sourceLineNo">212</span><a id="line.212"></a>
+<span class="sourceLineNo">213</span><a id="line.213">    /**</a>
+<span class="sourceLineNo">214</span><a id="line.214">     * Returns the String representation of the {@link #sum}.</a>
+<span class="sourceLineNo">215</span><a id="line.215">     * @return the String representation of the {@link #sum}</a>
+<span class="sourceLineNo">216</span><a id="line.216">     */</a>
+<span class="sourceLineNo">217</span><a id="line.217">    public String toString() {</a>
+<span class="sourceLineNo">218</span><a id="line.218">        return Double.toString(sum());</a>
+<span class="sourceLineNo">219</span><a id="line.219">    }</a>
+<span class="sourceLineNo">220</span><a id="line.220"></a>
+<span class="sourceLineNo">221</span><a id="line.221">    /**</a>
+<span class="sourceLineNo">222</span><a id="line.222">     * Equivalent to {@link #sum}.</a>
+<span class="sourceLineNo">223</span><a id="line.223">     *</a>
+<span class="sourceLineNo">224</span><a id="line.224">     * @return the sum</a>
+<span class="sourceLineNo">225</span><a id="line.225">     */</a>
+<span class="sourceLineNo">226</span><a id="line.226">    public double doubleValue() {</a>
+<span class="sourceLineNo">227</span><a id="line.227">        return sum();</a>
+<span class="sourceLineNo">228</span><a id="line.228">    }</a>
+<span class="sourceLineNo">229</span><a id="line.229"></a>
+<span class="sourceLineNo">230</span><a id="line.230">    /**</a>
+<span class="sourceLineNo">231</span><a id="line.231">     * Returns the {@link #sum} as a {@code long} after a</a>
+<span class="sourceLineNo">232</span><a id="line.232">     * narrowing primitive conversion.</a>
+<span class="sourceLineNo">233</span><a id="line.233">     */</a>
+<span class="sourceLineNo">234</span><a id="line.234">    public long longValue() {</a>
+<span class="sourceLineNo">235</span><a id="line.235">        return (long)sum();</a>
+<span class="sourceLineNo">236</span><a id="line.236">    }</a>
+<span class="sourceLineNo">237</span><a id="line.237"></a>
+<span class="sourceLineNo">238</span><a id="line.238">    /**</a>
+<span class="sourceLineNo">239</span><a id="line.239">     * Returns the {@link #sum} as an {@code int} after a</a>
+<span class="sourceLineNo">240</span><a id="line.240">     * narrowing primitive conversion.</a>
+<span class="sourceLineNo">241</span><a id="line.241">     */</a>
+<span class="sourceLineNo">242</span><a id="line.242">    public int intValue() {</a>
+<span class="sourceLineNo">243</span><a id="line.243">        return (int)sum();</a>
+<span class="sourceLineNo">244</span><a id="line.244">    }</a>
+<span class="sourceLineNo">245</span><a id="line.245"></a>
+<span class="sourceLineNo">246</span><a id="line.246">    /**</a>
+<span class="sourceLineNo">247</span><a id="line.247">     * Returns the {@link #sum} as a {@code float}</a>
+<span class="sourceLineNo">248</span><a id="line.248">     * after a narrowing primitive conversion.</a>
+<span class="sourceLineNo">249</span><a id="line.249">     */</a>
+<span class="sourceLineNo">250</span><a id="line.250">    public float floatValue() {</a>
+<span class="sourceLineNo">251</span><a id="line.251">        return (float)sum();</a>
+<span class="sourceLineNo">252</span><a id="line.252">    }</a>
+<span class="sourceLineNo">253</span><a id="line.253"></a>
+<span class="sourceLineNo">254</span><a id="line.254">    private void writeObject(ObjectOutputStream s) throws IOException {</a>
+<span class="sourceLineNo">255</span><a id="line.255">        s.defaultWriteObject();</a>
+<span class="sourceLineNo">256</span><a id="line.256">        s.writeDouble(sum());</a>
+<span class="sourceLineNo">257</span><a id="line.257">    }</a>
+<span class="sourceLineNo">258</span><a id="line.258"></a>
+<span class="sourceLineNo">259</span><a id="line.259">    private void readObject(ObjectInputStream s)</a>
+<span class="sourceLineNo">260</span><a id="line.260">            throws IOException, ClassNotFoundException {</a>
+<span class="sourceLineNo">261</span><a id="line.261">        s.defaultReadObject();</a>
+<span class="sourceLineNo">262</span><a id="line.262">        busy = 0;</a>
+<span class="sourceLineNo">263</span><a id="line.263">        cells = null;</a>
+<span class="sourceLineNo">264</span><a id="line.264">        base = Double.doubleToRawLongBits(s.readDouble());</a>
+<span class="sourceLineNo">265</span><a id="line.265">    }</a>
+<span class="sourceLineNo">266</span><a id="line.266"></a>
+<span class="sourceLineNo">267</span><a id="line.267">}</a>
 
 
 
@@ -335,5 +336,6 @@
 
 </pre>
 </div>
+</main>
 </body>
 </html>

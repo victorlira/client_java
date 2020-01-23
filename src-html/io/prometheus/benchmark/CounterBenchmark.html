@@ -1,127 +1,128 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE HTML>
 <html lang="en">
 <head>
 <title>Source code</title>
 <link rel="stylesheet" type="text/css" href="../../../../stylesheet.css" title="Style">
 </head>
 <body>
+<main role="main">
 <div class="sourceContainer">
-<pre><span class="sourceLineNo">001</span>package io.prometheus.benchmark;<a name="line.1"></a>
-<span class="sourceLineNo">002</span><a name="line.2"></a>
-<span class="sourceLineNo">003</span>import com.codahale.metrics.MetricRegistry;<a name="line.3"></a>
-<span class="sourceLineNo">004</span><a name="line.4"></a>
-<span class="sourceLineNo">005</span>import java.util.concurrent.TimeUnit;<a name="line.5"></a>
-<span class="sourceLineNo">006</span>import org.openjdk.jmh.annotations.BenchmarkMode;<a name="line.6"></a>
-<span class="sourceLineNo">007</span>import org.openjdk.jmh.annotations.Mode;<a name="line.7"></a>
-<span class="sourceLineNo">008</span>import org.openjdk.jmh.annotations.Benchmark;<a name="line.8"></a>
-<span class="sourceLineNo">009</span>import org.openjdk.jmh.annotations.OutputTimeUnit;<a name="line.9"></a>
-<span class="sourceLineNo">010</span>import org.openjdk.jmh.annotations.Scope;<a name="line.10"></a>
-<span class="sourceLineNo">011</span>import org.openjdk.jmh.annotations.Setup;<a name="line.11"></a>
-<span class="sourceLineNo">012</span>import org.openjdk.jmh.annotations.State;<a name="line.12"></a>
-<span class="sourceLineNo">013</span>import org.openjdk.jmh.runner.Runner;<a name="line.13"></a>
-<span class="sourceLineNo">014</span>import org.openjdk.jmh.runner.RunnerException;<a name="line.14"></a>
-<span class="sourceLineNo">015</span>import org.openjdk.jmh.runner.options.Options;<a name="line.15"></a>
-<span class="sourceLineNo">016</span>import org.openjdk.jmh.runner.options.OptionsBuilder;<a name="line.16"></a>
-<span class="sourceLineNo">017</span><a name="line.17"></a>
-<span class="sourceLineNo">018</span>@State(Scope.Benchmark)<a name="line.18"></a>
-<span class="sourceLineNo">019</span>public class CounterBenchmark {<a name="line.19"></a>
-<span class="sourceLineNo">020</span><a name="line.20"></a>
-<span class="sourceLineNo">021</span>  MetricRegistry registry;<a name="line.21"></a>
-<span class="sourceLineNo">022</span>  com.codahale.metrics.Counter codahaleCounter;<a name="line.22"></a>
-<span class="sourceLineNo">023</span>  com.codahale.metrics.Meter codahaleMeter;<a name="line.23"></a>
-<span class="sourceLineNo">024</span><a name="line.24"></a>
-<span class="sourceLineNo">025</span>  io.prometheus.client.metrics.Counter prometheusCounter;<a name="line.25"></a>
-<span class="sourceLineNo">026</span>  io.prometheus.client.metrics.Counter.Child prometheusCounterChild;<a name="line.26"></a>
-<span class="sourceLineNo">027</span>  io.prometheus.client.Counter prometheusSimpleCounter;<a name="line.27"></a>
-<span class="sourceLineNo">028</span>  io.prometheus.client.Counter.Child prometheusSimpleCounterChild;<a name="line.28"></a>
-<span class="sourceLineNo">029</span>  io.prometheus.client.Counter prometheusSimpleCounterNoLabels;<a name="line.29"></a>
-<span class="sourceLineNo">030</span><a name="line.30"></a>
-<span class="sourceLineNo">031</span>  @Setup<a name="line.31"></a>
-<span class="sourceLineNo">032</span>  public void setup() {<a name="line.32"></a>
-<span class="sourceLineNo">033</span>    prometheusCounter = io.prometheus.client.metrics.Counter.newBuilder()<a name="line.33"></a>
-<span class="sourceLineNo">034</span>      .name("name")<a name="line.34"></a>
-<span class="sourceLineNo">035</span>      .documentation("some description..")<a name="line.35"></a>
-<span class="sourceLineNo">036</span>      .build();<a name="line.36"></a>
-<span class="sourceLineNo">037</span>    prometheusCounterChild = prometheusCounter.newPartial().apply();<a name="line.37"></a>
-<span class="sourceLineNo">038</span><a name="line.38"></a>
-<span class="sourceLineNo">039</span>    prometheusSimpleCounter = io.prometheus.client.Counter.build()<a name="line.39"></a>
-<span class="sourceLineNo">040</span>      .name("name")<a name="line.40"></a>
-<span class="sourceLineNo">041</span>      .help("some description..")<a name="line.41"></a>
-<span class="sourceLineNo">042</span>      .labelNames("some", "group").create();<a name="line.42"></a>
-<span class="sourceLineNo">043</span>    prometheusSimpleCounterChild = prometheusSimpleCounter.labels("test", "group");<a name="line.43"></a>
-<span class="sourceLineNo">044</span><a name="line.44"></a>
-<span class="sourceLineNo">045</span>    prometheusSimpleCounterNoLabels = io.prometheus.client.Counter.build()<a name="line.45"></a>
-<span class="sourceLineNo">046</span>      .name("name")<a name="line.46"></a>
-<span class="sourceLineNo">047</span>      .help("some description..")<a name="line.47"></a>
-<span class="sourceLineNo">048</span>      .create();<a name="line.48"></a>
-<span class="sourceLineNo">049</span><a name="line.49"></a>
-<span class="sourceLineNo">050</span>    registry = new MetricRegistry();<a name="line.50"></a>
-<span class="sourceLineNo">051</span>    codahaleCounter = registry.counter("counter");<a name="line.51"></a>
-<span class="sourceLineNo">052</span>    codahaleMeter = registry.meter("meter");<a name="line.52"></a>
-<span class="sourceLineNo">053</span>  }<a name="line.53"></a>
-<span class="sourceLineNo">054</span><a name="line.54"></a>
-<span class="sourceLineNo">055</span>  @Benchmark<a name="line.55"></a>
-<span class="sourceLineNo">056</span>  @BenchmarkMode({Mode.AverageTime})<a name="line.56"></a>
-<span class="sourceLineNo">057</span>  @OutputTimeUnit(TimeUnit.NANOSECONDS)<a name="line.57"></a>
-<span class="sourceLineNo">058</span>  public void prometheusCounterIncBenchmark() {<a name="line.58"></a>
-<span class="sourceLineNo">059</span>    prometheusCounter.newPartial().apply().increment();<a name="line.59"></a>
-<span class="sourceLineNo">060</span>  }<a name="line.60"></a>
-<span class="sourceLineNo">061</span><a name="line.61"></a>
-<span class="sourceLineNo">062</span>  @Benchmark<a name="line.62"></a>
-<span class="sourceLineNo">063</span>  @BenchmarkMode({Mode.AverageTime})<a name="line.63"></a>
-<span class="sourceLineNo">064</span>  @OutputTimeUnit(TimeUnit.NANOSECONDS)<a name="line.64"></a>
-<span class="sourceLineNo">065</span>  public void prometheusCounterChildIncBenchmark() {<a name="line.65"></a>
-<span class="sourceLineNo">066</span>    prometheusCounterChild.increment();<a name="line.66"></a>
-<span class="sourceLineNo">067</span>  }<a name="line.67"></a>
-<span class="sourceLineNo">068</span><a name="line.68"></a>
-<span class="sourceLineNo">069</span>  @Benchmark<a name="line.69"></a>
-<span class="sourceLineNo">070</span>  @BenchmarkMode({Mode.AverageTime})<a name="line.70"></a>
-<span class="sourceLineNo">071</span>  @OutputTimeUnit(TimeUnit.NANOSECONDS)<a name="line.71"></a>
-<span class="sourceLineNo">072</span>  public void prometheusSimpleCounterIncBenchmark() {<a name="line.72"></a>
-<span class="sourceLineNo">073</span>    prometheusSimpleCounter.labels("test", "group").inc(); <a name="line.73"></a>
-<span class="sourceLineNo">074</span>  }<a name="line.74"></a>
-<span class="sourceLineNo">075</span>  <a name="line.75"></a>
-<span class="sourceLineNo">076</span>  @Benchmark<a name="line.76"></a>
-<span class="sourceLineNo">077</span>  @BenchmarkMode({Mode.AverageTime})<a name="line.77"></a>
-<span class="sourceLineNo">078</span>  @OutputTimeUnit(TimeUnit.NANOSECONDS)<a name="line.78"></a>
-<span class="sourceLineNo">079</span>  public void prometheusSimpleCounterChildIncBenchmark() {<a name="line.79"></a>
-<span class="sourceLineNo">080</span>    prometheusSimpleCounterChild.inc(); <a name="line.80"></a>
-<span class="sourceLineNo">081</span>  }<a name="line.81"></a>
-<span class="sourceLineNo">082</span><a name="line.82"></a>
-<span class="sourceLineNo">083</span>  @Benchmark<a name="line.83"></a>
-<span class="sourceLineNo">084</span>  @BenchmarkMode({Mode.AverageTime})<a name="line.84"></a>
-<span class="sourceLineNo">085</span>  @OutputTimeUnit(TimeUnit.NANOSECONDS)<a name="line.85"></a>
-<span class="sourceLineNo">086</span>  public void prometheusSimpleCounterNoLabelsIncBenchmark() {<a name="line.86"></a>
-<span class="sourceLineNo">087</span>    prometheusSimpleCounterNoLabels.inc(); <a name="line.87"></a>
-<span class="sourceLineNo">088</span>  }<a name="line.88"></a>
-<span class="sourceLineNo">089</span><a name="line.89"></a>
-<span class="sourceLineNo">090</span>  @Benchmark<a name="line.90"></a>
-<span class="sourceLineNo">091</span>  @BenchmarkMode({Mode.AverageTime})<a name="line.91"></a>
-<span class="sourceLineNo">092</span>  @OutputTimeUnit(TimeUnit.NANOSECONDS)<a name="line.92"></a>
-<span class="sourceLineNo">093</span>  public void codahaleCounterIncBenchmark() {<a name="line.93"></a>
-<span class="sourceLineNo">094</span>    codahaleCounter.inc();<a name="line.94"></a>
-<span class="sourceLineNo">095</span>  }<a name="line.95"></a>
-<span class="sourceLineNo">096</span><a name="line.96"></a>
-<span class="sourceLineNo">097</span>  @Benchmark<a name="line.97"></a>
-<span class="sourceLineNo">098</span>  @BenchmarkMode({Mode.AverageTime})<a name="line.98"></a>
-<span class="sourceLineNo">099</span>  @OutputTimeUnit(TimeUnit.NANOSECONDS)<a name="line.99"></a>
-<span class="sourceLineNo">100</span>  public void codahaleMeterMarkBenchmark() {<a name="line.100"></a>
-<span class="sourceLineNo">101</span>    codahaleMeter.mark();<a name="line.101"></a>
-<span class="sourceLineNo">102</span>  }<a name="line.102"></a>
-<span class="sourceLineNo">103</span><a name="line.103"></a>
-<span class="sourceLineNo">104</span>  public static void main(String[] args) throws RunnerException {<a name="line.104"></a>
-<span class="sourceLineNo">105</span><a name="line.105"></a>
-<span class="sourceLineNo">106</span>    Options opt = new OptionsBuilder()<a name="line.106"></a>
-<span class="sourceLineNo">107</span>      .include(CounterBenchmark.class.getSimpleName())<a name="line.107"></a>
-<span class="sourceLineNo">108</span>      .warmupIterations(5)<a name="line.108"></a>
-<span class="sourceLineNo">109</span>      .measurementIterations(4)<a name="line.109"></a>
-<span class="sourceLineNo">110</span>      .threads(4)<a name="line.110"></a>
-<span class="sourceLineNo">111</span>      .forks(1)<a name="line.111"></a>
-<span class="sourceLineNo">112</span>      .build();<a name="line.112"></a>
-<span class="sourceLineNo">113</span><a name="line.113"></a>
-<span class="sourceLineNo">114</span>    new Runner(opt).run();<a name="line.114"></a>
-<span class="sourceLineNo">115</span>  }<a name="line.115"></a>
-<span class="sourceLineNo">116</span>}<a name="line.116"></a>
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.benchmark;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import com.codahale.metrics.MetricRegistry;</a>
+<span class="sourceLineNo">004</span><a id="line.4"></a>
+<span class="sourceLineNo">005</span><a id="line.5">import java.util.concurrent.TimeUnit;</a>
+<span class="sourceLineNo">006</span><a id="line.6">import org.openjdk.jmh.annotations.BenchmarkMode;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import org.openjdk.jmh.annotations.Mode;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import org.openjdk.jmh.annotations.Benchmark;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import org.openjdk.jmh.annotations.OutputTimeUnit;</a>
+<span class="sourceLineNo">010</span><a id="line.10">import org.openjdk.jmh.annotations.Scope;</a>
+<span class="sourceLineNo">011</span><a id="line.11">import org.openjdk.jmh.annotations.Setup;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import org.openjdk.jmh.annotations.State;</a>
+<span class="sourceLineNo">013</span><a id="line.13">import org.openjdk.jmh.runner.Runner;</a>
+<span class="sourceLineNo">014</span><a id="line.14">import org.openjdk.jmh.runner.RunnerException;</a>
+<span class="sourceLineNo">015</span><a id="line.15">import org.openjdk.jmh.runner.options.Options;</a>
+<span class="sourceLineNo">016</span><a id="line.16">import org.openjdk.jmh.runner.options.OptionsBuilder;</a>
+<span class="sourceLineNo">017</span><a id="line.17"></a>
+<span class="sourceLineNo">018</span><a id="line.18">@State(Scope.Benchmark)</a>
+<span class="sourceLineNo">019</span><a id="line.19">public class CounterBenchmark {</a>
+<span class="sourceLineNo">020</span><a id="line.20"></a>
+<span class="sourceLineNo">021</span><a id="line.21">  MetricRegistry registry;</a>
+<span class="sourceLineNo">022</span><a id="line.22">  com.codahale.metrics.Counter codahaleCounter;</a>
+<span class="sourceLineNo">023</span><a id="line.23">  com.codahale.metrics.Meter codahaleMeter;</a>
+<span class="sourceLineNo">024</span><a id="line.24"></a>
+<span class="sourceLineNo">025</span><a id="line.25">  io.prometheus.client.metrics.Counter prometheusCounter;</a>
+<span class="sourceLineNo">026</span><a id="line.26">  io.prometheus.client.metrics.Counter.Child prometheusCounterChild;</a>
+<span class="sourceLineNo">027</span><a id="line.27">  io.prometheus.client.Counter prometheusSimpleCounter;</a>
+<span class="sourceLineNo">028</span><a id="line.28">  io.prometheus.client.Counter.Child prometheusSimpleCounterChild;</a>
+<span class="sourceLineNo">029</span><a id="line.29">  io.prometheus.client.Counter prometheusSimpleCounterNoLabels;</a>
+<span class="sourceLineNo">030</span><a id="line.30"></a>
+<span class="sourceLineNo">031</span><a id="line.31">  @Setup</a>
+<span class="sourceLineNo">032</span><a id="line.32">  public void setup() {</a>
+<span class="sourceLineNo">033</span><a id="line.33">    prometheusCounter = io.prometheus.client.metrics.Counter.newBuilder()</a>
+<span class="sourceLineNo">034</span><a id="line.34">      .name("name")</a>
+<span class="sourceLineNo">035</span><a id="line.35">      .documentation("some description..")</a>
+<span class="sourceLineNo">036</span><a id="line.36">      .build();</a>
+<span class="sourceLineNo">037</span><a id="line.37">    prometheusCounterChild = prometheusCounter.newPartial().apply();</a>
+<span class="sourceLineNo">038</span><a id="line.38"></a>
+<span class="sourceLineNo">039</span><a id="line.39">    prometheusSimpleCounter = io.prometheus.client.Counter.build()</a>
+<span class="sourceLineNo">040</span><a id="line.40">      .name("name")</a>
+<span class="sourceLineNo">041</span><a id="line.41">      .help("some description..")</a>
+<span class="sourceLineNo">042</span><a id="line.42">      .labelNames("some", "group").create();</a>
+<span class="sourceLineNo">043</span><a id="line.43">    prometheusSimpleCounterChild = prometheusSimpleCounter.labels("test", "group");</a>
+<span class="sourceLineNo">044</span><a id="line.44"></a>
+<span class="sourceLineNo">045</span><a id="line.45">    prometheusSimpleCounterNoLabels = io.prometheus.client.Counter.build()</a>
+<span class="sourceLineNo">046</span><a id="line.46">      .name("name")</a>
+<span class="sourceLineNo">047</span><a id="line.47">      .help("some description..")</a>
+<span class="sourceLineNo">048</span><a id="line.48">      .create();</a>
+<span class="sourceLineNo">049</span><a id="line.49"></a>
+<span class="sourceLineNo">050</span><a id="line.50">    registry = new MetricRegistry();</a>
+<span class="sourceLineNo">051</span><a id="line.51">    codahaleCounter = registry.counter("counter");</a>
+<span class="sourceLineNo">052</span><a id="line.52">    codahaleMeter = registry.meter("meter");</a>
+<span class="sourceLineNo">053</span><a id="line.53">  }</a>
+<span class="sourceLineNo">054</span><a id="line.54"></a>
+<span class="sourceLineNo">055</span><a id="line.55">  @Benchmark</a>
+<span class="sourceLineNo">056</span><a id="line.56">  @BenchmarkMode({Mode.AverageTime})</a>
+<span class="sourceLineNo">057</span><a id="line.57">  @OutputTimeUnit(TimeUnit.NANOSECONDS)</a>
+<span class="sourceLineNo">058</span><a id="line.58">  public void prometheusCounterIncBenchmark() {</a>
+<span class="sourceLineNo">059</span><a id="line.59">    prometheusCounter.newPartial().apply().increment();</a>
+<span class="sourceLineNo">060</span><a id="line.60">  }</a>
+<span class="sourceLineNo">061</span><a id="line.61"></a>
+<span class="sourceLineNo">062</span><a id="line.62">  @Benchmark</a>
+<span class="sourceLineNo">063</span><a id="line.63">  @BenchmarkMode({Mode.AverageTime})</a>
+<span class="sourceLineNo">064</span><a id="line.64">  @OutputTimeUnit(TimeUnit.NANOSECONDS)</a>
+<span class="sourceLineNo">065</span><a id="line.65">  public void prometheusCounterChildIncBenchmark() {</a>
+<span class="sourceLineNo">066</span><a id="line.66">    prometheusCounterChild.increment();</a>
+<span class="sourceLineNo">067</span><a id="line.67">  }</a>
+<span class="sourceLineNo">068</span><a id="line.68"></a>
+<span class="sourceLineNo">069</span><a id="line.69">  @Benchmark</a>
+<span class="sourceLineNo">070</span><a id="line.70">  @BenchmarkMode({Mode.AverageTime})</a>
+<span class="sourceLineNo">071</span><a id="line.71">  @OutputTimeUnit(TimeUnit.NANOSECONDS)</a>
+<span class="sourceLineNo">072</span><a id="line.72">  public void prometheusSimpleCounterIncBenchmark() {</a>
+<span class="sourceLineNo">073</span><a id="line.73">    prometheusSimpleCounter.labels("test", "group").inc(); </a>
+<span class="sourceLineNo">074</span><a id="line.74">  }</a>
+<span class="sourceLineNo">075</span><a id="line.75">  </a>
+<span class="sourceLineNo">076</span><a id="line.76">  @Benchmark</a>
+<span class="sourceLineNo">077</span><a id="line.77">  @BenchmarkMode({Mode.AverageTime})</a>
+<span class="sourceLineNo">078</span><a id="line.78">  @OutputTimeUnit(TimeUnit.NANOSECONDS)</a>
+<span class="sourceLineNo">079</span><a id="line.79">  public void prometheusSimpleCounterChildIncBenchmark() {</a>
+<span class="sourceLineNo">080</span><a id="line.80">    prometheusSimpleCounterChild.inc(); </a>
+<span class="sourceLineNo">081</span><a id="line.81">  }</a>
+<span class="sourceLineNo">082</span><a id="line.82"></a>
+<span class="sourceLineNo">083</span><a id="line.83">  @Benchmark</a>
+<span class="sourceLineNo">084</span><a id="line.84">  @BenchmarkMode({Mode.AverageTime})</a>
+<span class="sourceLineNo">085</span><a id="line.85">  @OutputTimeUnit(TimeUnit.NANOSECONDS)</a>
+<span class="sourceLineNo">086</span><a id="line.86">  public void prometheusSimpleCounterNoLabelsIncBenchmark() {</a>
+<span class="sourceLineNo">087</span><a id="line.87">    prometheusSimpleCounterNoLabels.inc(); </a>
+<span class="sourceLineNo">088</span><a id="line.88">  }</a>
+<span class="sourceLineNo">089</span><a id="line.89"></a>
+<span class="sourceLineNo">090</span><a id="line.90">  @Benchmark</a>
+<span class="sourceLineNo">091</span><a id="line.91">  @BenchmarkMode({Mode.AverageTime})</a>
+<span class="sourceLineNo">092</span><a id="line.92">  @OutputTimeUnit(TimeUnit.NANOSECONDS)</a>
+<span class="sourceLineNo">093</span><a id="line.93">  public void codahaleCounterIncBenchmark() {</a>
+<span class="sourceLineNo">094</span><a id="line.94">    codahaleCounter.inc();</a>
+<span class="sourceLineNo">095</span><a id="line.95">  }</a>
+<span class="sourceLineNo">096</span><a id="line.96"></a>
+<span class="sourceLineNo">097</span><a id="line.97">  @Benchmark</a>
+<span class="sourceLineNo">098</span><a id="line.98">  @BenchmarkMode({Mode.AverageTime})</a>
+<span class="sourceLineNo">099</span><a id="line.99">  @OutputTimeUnit(TimeUnit.NANOSECONDS)</a>
+<span class="sourceLineNo">100</span><a id="line.100">  public void codahaleMeterMarkBenchmark() {</a>
+<span class="sourceLineNo">101</span><a id="line.101">    codahaleMeter.mark();</a>
+<span class="sourceLineNo">102</span><a id="line.102">  }</a>
+<span class="sourceLineNo">103</span><a id="line.103"></a>
+<span class="sourceLineNo">104</span><a id="line.104">  public static void main(String[] args) throws RunnerException {</a>
+<span class="sourceLineNo">105</span><a id="line.105"></a>
+<span class="sourceLineNo">106</span><a id="line.106">    Options opt = new OptionsBuilder()</a>
+<span class="sourceLineNo">107</span><a id="line.107">      .include(CounterBenchmark.class.getSimpleName())</a>
+<span class="sourceLineNo">108</span><a id="line.108">      .warmupIterations(5)</a>
+<span class="sourceLineNo">109</span><a id="line.109">      .measurementIterations(4)</a>
+<span class="sourceLineNo">110</span><a id="line.110">      .threads(4)</a>
+<span class="sourceLineNo">111</span><a id="line.111">      .forks(1)</a>
+<span class="sourceLineNo">112</span><a id="line.112">      .build();</a>
+<span class="sourceLineNo">113</span><a id="line.113"></a>
+<span class="sourceLineNo">114</span><a id="line.114">    new Runner(opt).run();</a>
+<span class="sourceLineNo">115</span><a id="line.115">  }</a>
+<span class="sourceLineNo">116</span><a id="line.116">}</a>
 
 
 
@@ -184,5 +185,6 @@
 
 </pre>
 </div>
+</main>
 </body>
 </html>

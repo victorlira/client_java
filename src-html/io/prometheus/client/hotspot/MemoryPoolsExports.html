@@ -1,139 +1,140 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE HTML>
 <html lang="en">
 <head>
 <title>Source code</title>
 <link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
 </head>
 <body>
+<main role="main">
 <div class="sourceContainer">
-<pre><span class="sourceLineNo">001</span>package io.prometheus.client.hotspot;<a name="line.1"></a>
-<span class="sourceLineNo">002</span><a name="line.2"></a>
-<span class="sourceLineNo">003</span>import io.prometheus.client.Collector;<a name="line.3"></a>
-<span class="sourceLineNo">004</span>import io.prometheus.client.GaugeMetricFamily;<a name="line.4"></a>
-<span class="sourceLineNo">005</span><a name="line.5"></a>
-<span class="sourceLineNo">006</span>import java.lang.management.ManagementFactory;<a name="line.6"></a>
-<span class="sourceLineNo">007</span>import java.lang.management.MemoryMXBean;<a name="line.7"></a>
-<span class="sourceLineNo">008</span>import java.lang.management.MemoryPoolMXBean;<a name="line.8"></a>
-<span class="sourceLineNo">009</span>import java.lang.management.MemoryUsage;<a name="line.9"></a>
-<span class="sourceLineNo">010</span>import java.util.ArrayList;<a name="line.10"></a>
-<span class="sourceLineNo">011</span>import java.util.Collections;<a name="line.11"></a>
-<span class="sourceLineNo">012</span>import java.util.List;<a name="line.12"></a>
-<span class="sourceLineNo">013</span><a name="line.13"></a>
-<span class="sourceLineNo">014</span>/**<a name="line.14"></a>
-<span class="sourceLineNo">015</span> * Exports metrics about JVM memory areas.<a name="line.15"></a>
-<span class="sourceLineNo">016</span> * &lt;p&gt;<a name="line.16"></a>
-<span class="sourceLineNo">017</span> * Example usage:<a name="line.17"></a>
-<span class="sourceLineNo">018</span> * &lt;pre&gt;<a name="line.18"></a>
-<span class="sourceLineNo">019</span> * {@code<a name="line.19"></a>
-<span class="sourceLineNo">020</span> *   new MemoryPoolsExports().register();<a name="line.20"></a>
-<span class="sourceLineNo">021</span> * }<a name="line.21"></a>
-<span class="sourceLineNo">022</span> * &lt;/pre&gt;<a name="line.22"></a>
-<span class="sourceLineNo">023</span> * Example metrics being exported:<a name="line.23"></a>
-<span class="sourceLineNo">024</span> * &lt;pre&gt;<a name="line.24"></a>
-<span class="sourceLineNo">025</span> *   jvm_memory_bytes_used{area="heap"} 2000000<a name="line.25"></a>
-<span class="sourceLineNo">026</span> *   jvm_memory_bytes_committed{area="nonheap"} 200000<a name="line.26"></a>
-<span class="sourceLineNo">027</span> *   jvm_memory_bytes_max{area="nonheap"} 2000000<a name="line.27"></a>
-<span class="sourceLineNo">028</span> *   jvm_memory_pool_bytes_used{pool="PS Eden Space"} 2000<a name="line.28"></a>
-<span class="sourceLineNo">029</span> * &lt;/pre&gt;<a name="line.29"></a>
-<span class="sourceLineNo">030</span> */<a name="line.30"></a>
-<span class="sourceLineNo">031</span>public class MemoryPoolsExports extends Collector {<a name="line.31"></a>
-<span class="sourceLineNo">032</span>  private final MemoryMXBean memoryBean;<a name="line.32"></a>
-<span class="sourceLineNo">033</span>  private final List&lt;MemoryPoolMXBean&gt; poolBeans;<a name="line.33"></a>
-<span class="sourceLineNo">034</span><a name="line.34"></a>
-<span class="sourceLineNo">035</span>  public MemoryPoolsExports() {<a name="line.35"></a>
-<span class="sourceLineNo">036</span>    this(<a name="line.36"></a>
-<span class="sourceLineNo">037</span>        ManagementFactory.getMemoryMXBean(),<a name="line.37"></a>
-<span class="sourceLineNo">038</span>        ManagementFactory.getMemoryPoolMXBeans());<a name="line.38"></a>
-<span class="sourceLineNo">039</span>  }<a name="line.39"></a>
-<span class="sourceLineNo">040</span><a name="line.40"></a>
-<span class="sourceLineNo">041</span>  public MemoryPoolsExports(MemoryMXBean memoryBean,<a name="line.41"></a>
-<span class="sourceLineNo">042</span>                             List&lt;MemoryPoolMXBean&gt; poolBeans) {<a name="line.42"></a>
-<span class="sourceLineNo">043</span>    this.memoryBean = memoryBean;<a name="line.43"></a>
-<span class="sourceLineNo">044</span>    this.poolBeans = poolBeans;<a name="line.44"></a>
-<span class="sourceLineNo">045</span>  }<a name="line.45"></a>
-<span class="sourceLineNo">046</span><a name="line.46"></a>
-<span class="sourceLineNo">047</span>  void addMemoryAreaMetrics(List&lt;MetricFamilySamples&gt; sampleFamilies) {<a name="line.47"></a>
-<span class="sourceLineNo">048</span>    MemoryUsage heapUsage = memoryBean.getHeapMemoryUsage();<a name="line.48"></a>
-<span class="sourceLineNo">049</span>    MemoryUsage nonHeapUsage = memoryBean.getNonHeapMemoryUsage();<a name="line.49"></a>
-<span class="sourceLineNo">050</span><a name="line.50"></a>
-<span class="sourceLineNo">051</span>    GaugeMetricFamily used = new GaugeMetricFamily(<a name="line.51"></a>
-<span class="sourceLineNo">052</span>        "jvm_memory_bytes_used",<a name="line.52"></a>
-<span class="sourceLineNo">053</span>        "Used bytes of a given JVM memory area.",<a name="line.53"></a>
-<span class="sourceLineNo">054</span>        Collections.singletonList("area"));<a name="line.54"></a>
-<span class="sourceLineNo">055</span>    used.addMetric(Collections.singletonList("heap"), heapUsage.getUsed());<a name="line.55"></a>
-<span class="sourceLineNo">056</span>    used.addMetric(Collections.singletonList("nonheap"), nonHeapUsage.getUsed());<a name="line.56"></a>
-<span class="sourceLineNo">057</span>    sampleFamilies.add(used);<a name="line.57"></a>
-<span class="sourceLineNo">058</span><a name="line.58"></a>
-<span class="sourceLineNo">059</span>    GaugeMetricFamily committed = new GaugeMetricFamily(<a name="line.59"></a>
-<span class="sourceLineNo">060</span>        "jvm_memory_bytes_committed",<a name="line.60"></a>
-<span class="sourceLineNo">061</span>        "Committed (bytes) of a given JVM memory area.",<a name="line.61"></a>
-<span class="sourceLineNo">062</span>        Collections.singletonList("area"));<a name="line.62"></a>
-<span class="sourceLineNo">063</span>    committed.addMetric(Collections.singletonList("heap"), heapUsage.getCommitted());<a name="line.63"></a>
-<span class="sourceLineNo">064</span>    committed.addMetric(Collections.singletonList("nonheap"), nonHeapUsage.getCommitted());<a name="line.64"></a>
-<span class="sourceLineNo">065</span>    sampleFamilies.add(committed);<a name="line.65"></a>
-<span class="sourceLineNo">066</span><a name="line.66"></a>
-<span class="sourceLineNo">067</span>    GaugeMetricFamily max = new GaugeMetricFamily(<a name="line.67"></a>
-<span class="sourceLineNo">068</span>        "jvm_memory_bytes_max",<a name="line.68"></a>
-<span class="sourceLineNo">069</span>        "Max (bytes) of a given JVM memory area.",<a name="line.69"></a>
-<span class="sourceLineNo">070</span>        Collections.singletonList("area"));<a name="line.70"></a>
-<span class="sourceLineNo">071</span>    max.addMetric(Collections.singletonList("heap"), heapUsage.getMax());<a name="line.71"></a>
-<span class="sourceLineNo">072</span>    max.addMetric(Collections.singletonList("nonheap"), nonHeapUsage.getMax());<a name="line.72"></a>
-<span class="sourceLineNo">073</span>    sampleFamilies.add(max);<a name="line.73"></a>
-<span class="sourceLineNo">074</span><a name="line.74"></a>
-<span class="sourceLineNo">075</span>    GaugeMetricFamily init = new GaugeMetricFamily(<a name="line.75"></a>
-<span class="sourceLineNo">076</span>        "jvm_memory_bytes_init",<a name="line.76"></a>
-<span class="sourceLineNo">077</span>        "Initial bytes of a given JVM memory area.",<a name="line.77"></a>
-<span class="sourceLineNo">078</span>        Collections.singletonList("area"));<a name="line.78"></a>
-<span class="sourceLineNo">079</span>    init.addMetric(Collections.singletonList("heap"), heapUsage.getInit());<a name="line.79"></a>
-<span class="sourceLineNo">080</span>    init.addMetric(Collections.singletonList("nonheap"), nonHeapUsage.getInit());<a name="line.80"></a>
-<span class="sourceLineNo">081</span>    sampleFamilies.add(init);<a name="line.81"></a>
-<span class="sourceLineNo">082</span>  }<a name="line.82"></a>
-<span class="sourceLineNo">083</span><a name="line.83"></a>
-<span class="sourceLineNo">084</span>  void addMemoryPoolMetrics(List&lt;MetricFamilySamples&gt; sampleFamilies) {<a name="line.84"></a>
-<span class="sourceLineNo">085</span>    GaugeMetricFamily used = new GaugeMetricFamily(<a name="line.85"></a>
-<span class="sourceLineNo">086</span>        "jvm_memory_pool_bytes_used",<a name="line.86"></a>
-<span class="sourceLineNo">087</span>        "Used bytes of a given JVM memory pool.",<a name="line.87"></a>
-<span class="sourceLineNo">088</span>        Collections.singletonList("pool"));<a name="line.88"></a>
-<span class="sourceLineNo">089</span>    sampleFamilies.add(used);<a name="line.89"></a>
-<span class="sourceLineNo">090</span>    GaugeMetricFamily committed = new GaugeMetricFamily(<a name="line.90"></a>
-<span class="sourceLineNo">091</span>        "jvm_memory_pool_bytes_committed",<a name="line.91"></a>
-<span class="sourceLineNo">092</span>        "Committed bytes of a given JVM memory pool.",<a name="line.92"></a>
-<span class="sourceLineNo">093</span>        Collections.singletonList("pool"));<a name="line.93"></a>
-<span class="sourceLineNo">094</span>    sampleFamilies.add(committed);<a name="line.94"></a>
-<span class="sourceLineNo">095</span>    GaugeMetricFamily max = new GaugeMetricFamily(<a name="line.95"></a>
-<span class="sourceLineNo">096</span>        "jvm_memory_pool_bytes_max",<a name="line.96"></a>
-<span class="sourceLineNo">097</span>        "Max bytes of a given JVM memory pool.",<a name="line.97"></a>
-<span class="sourceLineNo">098</span>        Collections.singletonList("pool"));<a name="line.98"></a>
-<span class="sourceLineNo">099</span>    sampleFamilies.add(max);<a name="line.99"></a>
-<span class="sourceLineNo">100</span>    GaugeMetricFamily init = new GaugeMetricFamily(<a name="line.100"></a>
-<span class="sourceLineNo">101</span>        "jvm_memory_pool_bytes_init",<a name="line.101"></a>
-<span class="sourceLineNo">102</span>        "Initial bytes of a given JVM memory pool.",<a name="line.102"></a>
-<span class="sourceLineNo">103</span>        Collections.singletonList("pool"));<a name="line.103"></a>
-<span class="sourceLineNo">104</span>    sampleFamilies.add(init);<a name="line.104"></a>
-<span class="sourceLineNo">105</span>    for (final MemoryPoolMXBean pool : poolBeans) {<a name="line.105"></a>
-<span class="sourceLineNo">106</span>      MemoryUsage poolUsage = pool.getUsage();<a name="line.106"></a>
-<span class="sourceLineNo">107</span>      used.addMetric(<a name="line.107"></a>
-<span class="sourceLineNo">108</span>          Collections.singletonList(pool.getName()),<a name="line.108"></a>
-<span class="sourceLineNo">109</span>          poolUsage.getUsed());<a name="line.109"></a>
-<span class="sourceLineNo">110</span>      committed.addMetric(<a name="line.110"></a>
-<span class="sourceLineNo">111</span>          Collections.singletonList(pool.getName()),<a name="line.111"></a>
-<span class="sourceLineNo">112</span>          poolUsage.getCommitted());<a name="line.112"></a>
-<span class="sourceLineNo">113</span>      max.addMetric(<a name="line.113"></a>
-<span class="sourceLineNo">114</span>          Collections.singletonList(pool.getName()),<a name="line.114"></a>
-<span class="sourceLineNo">115</span>          poolUsage.getMax());<a name="line.115"></a>
-<span class="sourceLineNo">116</span>      init.addMetric(<a name="line.116"></a>
-<span class="sourceLineNo">117</span>          Collections.singletonList(pool.getName()),<a name="line.117"></a>
-<span class="sourceLineNo">118</span>          poolUsage.getInit());<a name="line.118"></a>
-<span class="sourceLineNo">119</span>    }<a name="line.119"></a>
-<span class="sourceLineNo">120</span>  }<a name="line.120"></a>
-<span class="sourceLineNo">121</span><a name="line.121"></a>
-<span class="sourceLineNo">122</span>  public List&lt;MetricFamilySamples&gt; collect() {<a name="line.122"></a>
-<span class="sourceLineNo">123</span>    List&lt;MetricFamilySamples&gt; mfs = new ArrayList&lt;MetricFamilySamples&gt;();<a name="line.123"></a>
-<span class="sourceLineNo">124</span>    addMemoryAreaMetrics(mfs);<a name="line.124"></a>
-<span class="sourceLineNo">125</span>    addMemoryPoolMetrics(mfs);<a name="line.125"></a>
-<span class="sourceLineNo">126</span>    return mfs;<a name="line.126"></a>
-<span class="sourceLineNo">127</span>  }<a name="line.127"></a>
-<span class="sourceLineNo">128</span>}<a name="line.128"></a>
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.hotspot;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import io.prometheus.client.Collector;</a>
+<span class="sourceLineNo">004</span><a id="line.4">import io.prometheus.client.GaugeMetricFamily;</a>
+<span class="sourceLineNo">005</span><a id="line.5"></a>
+<span class="sourceLineNo">006</span><a id="line.6">import java.lang.management.ManagementFactory;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import java.lang.management.MemoryMXBean;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import java.lang.management.MemoryPoolMXBean;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import java.lang.management.MemoryUsage;</a>
+<span class="sourceLineNo">010</span><a id="line.10">import java.util.ArrayList;</a>
+<span class="sourceLineNo">011</span><a id="line.11">import java.util.Collections;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import java.util.List;</a>
+<span class="sourceLineNo">013</span><a id="line.13"></a>
+<span class="sourceLineNo">014</span><a id="line.14">/**</a>
+<span class="sourceLineNo">015</span><a id="line.15"> * Exports metrics about JVM memory areas.</a>
+<span class="sourceLineNo">016</span><a id="line.16"> * &lt;p&gt;</a>
+<span class="sourceLineNo">017</span><a id="line.17"> * Example usage:</a>
+<span class="sourceLineNo">018</span><a id="line.18"> * &lt;pre&gt;</a>
+<span class="sourceLineNo">019</span><a id="line.19"> * {@code</a>
+<span class="sourceLineNo">020</span><a id="line.20"> *   new MemoryPoolsExports().register();</a>
+<span class="sourceLineNo">021</span><a id="line.21"> * }</a>
+<span class="sourceLineNo">022</span><a id="line.22"> * &lt;/pre&gt;</a>
+<span class="sourceLineNo">023</span><a id="line.23"> * Example metrics being exported:</a>
+<span class="sourceLineNo">024</span><a id="line.24"> * &lt;pre&gt;</a>
+<span class="sourceLineNo">025</span><a id="line.25"> *   jvm_memory_bytes_used{area="heap"} 2000000</a>
+<span class="sourceLineNo">026</span><a id="line.26"> *   jvm_memory_bytes_committed{area="nonheap"} 200000</a>
+<span class="sourceLineNo">027</span><a id="line.27"> *   jvm_memory_bytes_max{area="nonheap"} 2000000</a>
+<span class="sourceLineNo">028</span><a id="line.28"> *   jvm_memory_pool_bytes_used{pool="PS Eden Space"} 2000</a>
+<span class="sourceLineNo">029</span><a id="line.29"> * &lt;/pre&gt;</a>
+<span class="sourceLineNo">030</span><a id="line.30"> */</a>
+<span class="sourceLineNo">031</span><a id="line.31">public class MemoryPoolsExports extends Collector {</a>
+<span class="sourceLineNo">032</span><a id="line.32">  private final MemoryMXBean memoryBean;</a>
+<span class="sourceLineNo">033</span><a id="line.33">  private final List&lt;MemoryPoolMXBean&gt; poolBeans;</a>
+<span class="sourceLineNo">034</span><a id="line.34"></a>
+<span class="sourceLineNo">035</span><a id="line.35">  public MemoryPoolsExports() {</a>
+<span class="sourceLineNo">036</span><a id="line.36">    this(</a>
+<span class="sourceLineNo">037</span><a id="line.37">        ManagementFactory.getMemoryMXBean(),</a>
+<span class="sourceLineNo">038</span><a id="line.38">        ManagementFactory.getMemoryPoolMXBeans());</a>
+<span class="sourceLineNo">039</span><a id="line.39">  }</a>
+<span class="sourceLineNo">040</span><a id="line.40"></a>
+<span class="sourceLineNo">041</span><a id="line.41">  public MemoryPoolsExports(MemoryMXBean memoryBean,</a>
+<span class="sourceLineNo">042</span><a id="line.42">                             List&lt;MemoryPoolMXBean&gt; poolBeans) {</a>
+<span class="sourceLineNo">043</span><a id="line.43">    this.memoryBean = memoryBean;</a>
+<span class="sourceLineNo">044</span><a id="line.44">    this.poolBeans = poolBeans;</a>
+<span class="sourceLineNo">045</span><a id="line.45">  }</a>
+<span class="sourceLineNo">046</span><a id="line.46"></a>
+<span class="sourceLineNo">047</span><a id="line.47">  void addMemoryAreaMetrics(List&lt;MetricFamilySamples&gt; sampleFamilies) {</a>
+<span class="sourceLineNo">048</span><a id="line.48">    MemoryUsage heapUsage = memoryBean.getHeapMemoryUsage();</a>
+<span class="sourceLineNo">049</span><a id="line.49">    MemoryUsage nonHeapUsage = memoryBean.getNonHeapMemoryUsage();</a>
+<span class="sourceLineNo">050</span><a id="line.50"></a>
+<span class="sourceLineNo">051</span><a id="line.51">    GaugeMetricFamily used = new GaugeMetricFamily(</a>
+<span class="sourceLineNo">052</span><a id="line.52">        "jvm_memory_bytes_used",</a>
+<span class="sourceLineNo">053</span><a id="line.53">        "Used bytes of a given JVM memory area.",</a>
+<span class="sourceLineNo">054</span><a id="line.54">        Collections.singletonList("area"));</a>
+<span class="sourceLineNo">055</span><a id="line.55">    used.addMetric(Collections.singletonList("heap"), heapUsage.getUsed());</a>
+<span class="sourceLineNo">056</span><a id="line.56">    used.addMetric(Collections.singletonList("nonheap"), nonHeapUsage.getUsed());</a>
+<span class="sourceLineNo">057</span><a id="line.57">    sampleFamilies.add(used);</a>
+<span class="sourceLineNo">058</span><a id="line.58"></a>
+<span class="sourceLineNo">059</span><a id="line.59">    GaugeMetricFamily committed = new GaugeMetricFamily(</a>
+<span class="sourceLineNo">060</span><a id="line.60">        "jvm_memory_bytes_committed",</a>
+<span class="sourceLineNo">061</span><a id="line.61">        "Committed (bytes) of a given JVM memory area.",</a>
+<span class="sourceLineNo">062</span><a id="line.62">        Collections.singletonList("area"));</a>
+<span class="sourceLineNo">063</span><a id="line.63">    committed.addMetric(Collections.singletonList("heap"), heapUsage.getCommitted());</a>
+<span class="sourceLineNo">064</span><a id="line.64">    committed.addMetric(Collections.singletonList("nonheap"), nonHeapUsage.getCommitted());</a>
+<span class="sourceLineNo">065</span><a id="line.65">    sampleFamilies.add(committed);</a>
+<span class="sourceLineNo">066</span><a id="line.66"></a>
+<span class="sourceLineNo">067</span><a id="line.67">    GaugeMetricFamily max = new GaugeMetricFamily(</a>
+<span class="sourceLineNo">068</span><a id="line.68">        "jvm_memory_bytes_max",</a>
+<span class="sourceLineNo">069</span><a id="line.69">        "Max (bytes) of a given JVM memory area.",</a>
+<span class="sourceLineNo">070</span><a id="line.70">        Collections.singletonList("area"));</a>
+<span class="sourceLineNo">071</span><a id="line.71">    max.addMetric(Collections.singletonList("heap"), heapUsage.getMax());</a>
+<span class="sourceLineNo">072</span><a id="line.72">    max.addMetric(Collections.singletonList("nonheap"), nonHeapUsage.getMax());</a>
+<span class="sourceLineNo">073</span><a id="line.73">    sampleFamilies.add(max);</a>
+<span class="sourceLineNo">074</span><a id="line.74"></a>
+<span class="sourceLineNo">075</span><a id="line.75">    GaugeMetricFamily init = new GaugeMetricFamily(</a>
+<span class="sourceLineNo">076</span><a id="line.76">        "jvm_memory_bytes_init",</a>
+<span class="sourceLineNo">077</span><a id="line.77">        "Initial bytes of a given JVM memory area.",</a>
+<span class="sourceLineNo">078</span><a id="line.78">        Collections.singletonList("area"));</a>
+<span class="sourceLineNo">079</span><a id="line.79">    init.addMetric(Collections.singletonList("heap"), heapUsage.getInit());</a>
+<span class="sourceLineNo">080</span><a id="line.80">    init.addMetric(Collections.singletonList("nonheap"), nonHeapUsage.getInit());</a>
+<span class="sourceLineNo">081</span><a id="line.81">    sampleFamilies.add(init);</a>
+<span class="sourceLineNo">082</span><a id="line.82">  }</a>
+<span class="sourceLineNo">083</span><a id="line.83"></a>
+<span class="sourceLineNo">084</span><a id="line.84">  void addMemoryPoolMetrics(List&lt;MetricFamilySamples&gt; sampleFamilies) {</a>
+<span class="sourceLineNo">085</span><a id="line.85">    GaugeMetricFamily used = new GaugeMetricFamily(</a>
+<span class="sourceLineNo">086</span><a id="line.86">        "jvm_memory_pool_bytes_used",</a>
+<span class="sourceLineNo">087</span><a id="line.87">        "Used bytes of a given JVM memory pool.",</a>
+<span class="sourceLineNo">088</span><a id="line.88">        Collections.singletonList("pool"));</a>
+<span class="sourceLineNo">089</span><a id="line.89">    sampleFamilies.add(used);</a>
+<span class="sourceLineNo">090</span><a id="line.90">    GaugeMetricFamily committed = new GaugeMetricFamily(</a>
+<span class="sourceLineNo">091</span><a id="line.91">        "jvm_memory_pool_bytes_committed",</a>
+<span class="sourceLineNo">092</span><a id="line.92">        "Committed bytes of a given JVM memory pool.",</a>
+<span class="sourceLineNo">093</span><a id="line.93">        Collections.singletonList("pool"));</a>
+<span class="sourceLineNo">094</span><a id="line.94">    sampleFamilies.add(committed);</a>
+<span class="sourceLineNo">095</span><a id="line.95">    GaugeMetricFamily max = new GaugeMetricFamily(</a>
+<span class="sourceLineNo">096</span><a id="line.96">        "jvm_memory_pool_bytes_max",</a>
+<span class="sourceLineNo">097</span><a id="line.97">        "Max bytes of a given JVM memory pool.",</a>
+<span class="sourceLineNo">098</span><a id="line.98">        Collections.singletonList("pool"));</a>
+<span class="sourceLineNo">099</span><a id="line.99">    sampleFamilies.add(max);</a>
+<span class="sourceLineNo">100</span><a id="line.100">    GaugeMetricFamily init = new GaugeMetricFamily(</a>
+<span class="sourceLineNo">101</span><a id="line.101">        "jvm_memory_pool_bytes_init",</a>
+<span class="sourceLineNo">102</span><a id="line.102">        "Initial bytes of a given JVM memory pool.",</a>
+<span class="sourceLineNo">103</span><a id="line.103">        Collections.singletonList("pool"));</a>
+<span class="sourceLineNo">104</span><a id="line.104">    sampleFamilies.add(init);</a>
+<span class="sourceLineNo">105</span><a id="line.105">    for (final MemoryPoolMXBean pool : poolBeans) {</a>
+<span class="sourceLineNo">106</span><a id="line.106">      MemoryUsage poolUsage = pool.getUsage();</a>
+<span class="sourceLineNo">107</span><a id="line.107">      used.addMetric(</a>
+<span class="sourceLineNo">108</span><a id="line.108">          Collections.singletonList(pool.getName()),</a>
+<span class="sourceLineNo">109</span><a id="line.109">          poolUsage.getUsed());</a>
+<span class="sourceLineNo">110</span><a id="line.110">      committed.addMetric(</a>
+<span class="sourceLineNo">111</span><a id="line.111">          Collections.singletonList(pool.getName()),</a>
+<span class="sourceLineNo">112</span><a id="line.112">          poolUsage.getCommitted());</a>
+<span class="sourceLineNo">113</span><a id="line.113">      max.addMetric(</a>
+<span class="sourceLineNo">114</span><a id="line.114">          Collections.singletonList(pool.getName()),</a>
+<span class="sourceLineNo">115</span><a id="line.115">          poolUsage.getMax());</a>
+<span class="sourceLineNo">116</span><a id="line.116">      init.addMetric(</a>
+<span class="sourceLineNo">117</span><a id="line.117">          Collections.singletonList(pool.getName()),</a>
+<span class="sourceLineNo">118</span><a id="line.118">          poolUsage.getInit());</a>
+<span class="sourceLineNo">119</span><a id="line.119">    }</a>
+<span class="sourceLineNo">120</span><a id="line.120">  }</a>
+<span class="sourceLineNo">121</span><a id="line.121"></a>
+<span class="sourceLineNo">122</span><a id="line.122">  public List&lt;MetricFamilySamples&gt; collect() {</a>
+<span class="sourceLineNo">123</span><a id="line.123">    List&lt;MetricFamilySamples&gt; mfs = new ArrayList&lt;MetricFamilySamples&gt;();</a>
+<span class="sourceLineNo">124</span><a id="line.124">    addMemoryAreaMetrics(mfs);</a>
+<span class="sourceLineNo">125</span><a id="line.125">    addMemoryPoolMetrics(mfs);</a>
+<span class="sourceLineNo">126</span><a id="line.126">    return mfs;</a>
+<span class="sourceLineNo">127</span><a id="line.127">  }</a>
+<span class="sourceLineNo">128</span><a id="line.128">}</a>
 
 
 
@@ -196,5 +197,6 @@
 
 </pre>
 </div>
+</main>
 </body>
 </html>

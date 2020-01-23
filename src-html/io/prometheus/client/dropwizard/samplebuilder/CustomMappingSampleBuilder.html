@@ -1,120 +1,121 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE HTML>
 <html lang="en">
 <head>
 <title>Source code</title>
 <link rel="stylesheet" type="text/css" href="../../../../../../stylesheet.css" title="Style">
 </head>
 <body>
+<main role="main">
 <div class="sourceContainer">
-<pre><span class="sourceLineNo">001</span>package io.prometheus.client.dropwizard.samplebuilder;<a name="line.1"></a>
-<span class="sourceLineNo">002</span><a name="line.2"></a>
-<span class="sourceLineNo">003</span>import io.prometheus.client.Collector;<a name="line.3"></a>
-<span class="sourceLineNo">004</span><a name="line.4"></a>
-<span class="sourceLineNo">005</span>import java.util.ArrayList;<a name="line.5"></a>
-<span class="sourceLineNo">006</span>import java.util.Collections;<a name="line.6"></a>
-<span class="sourceLineNo">007</span>import java.util.List;<a name="line.7"></a>
-<span class="sourceLineNo">008</span>import java.util.Map;<a name="line.8"></a>
-<span class="sourceLineNo">009</span><a name="line.9"></a>
-<span class="sourceLineNo">010</span>/**<a name="line.10"></a>
-<span class="sourceLineNo">011</span> * Custom {@link SampleBuilder} implementation to allow Dropwizard metrics to be translated to Prometheus metrics including custom labels and names.<a name="line.11"></a>
-<span class="sourceLineNo">012</span> * Prometheus metric name and labels are extracted from the Dropwizard name based on the provided list of {@link MapperConfig}s.<a name="line.12"></a>
-<span class="sourceLineNo">013</span> * The FIRST matching config will be used.<a name="line.13"></a>
-<span class="sourceLineNo">014</span> * If no config is matched, the {@link DefaultSampleBuilder} is used.<a name="line.14"></a>
-<span class="sourceLineNo">015</span> */<a name="line.15"></a>
-<span class="sourceLineNo">016</span>public class CustomMappingSampleBuilder implements SampleBuilder {<a name="line.16"></a>
-<span class="sourceLineNo">017</span>    private final List&lt;CompiledMapperConfig&gt; compiledMapperConfigs;<a name="line.17"></a>
-<span class="sourceLineNo">018</span>    private final DefaultSampleBuilder defaultMetricSampleBuilder = new DefaultSampleBuilder();<a name="line.18"></a>
-<span class="sourceLineNo">019</span><a name="line.19"></a>
-<span class="sourceLineNo">020</span>    public CustomMappingSampleBuilder(final List&lt;MapperConfig&gt; mapperConfigs) {<a name="line.20"></a>
-<span class="sourceLineNo">021</span>        if (mapperConfigs == null || mapperConfigs.isEmpty()) {<a name="line.21"></a>
-<span class="sourceLineNo">022</span>            throw new IllegalArgumentException("CustomMappingSampleBuilder needs some mapper configs!");<a name="line.22"></a>
-<span class="sourceLineNo">023</span>        }<a name="line.23"></a>
-<span class="sourceLineNo">024</span><a name="line.24"></a>
-<span class="sourceLineNo">025</span>        this.compiledMapperConfigs = new ArrayList&lt;CompiledMapperConfig&gt;(mapperConfigs.size());<a name="line.25"></a>
-<span class="sourceLineNo">026</span>        for (MapperConfig config : mapperConfigs) {<a name="line.26"></a>
-<span class="sourceLineNo">027</span>            this.compiledMapperConfigs.add(new CompiledMapperConfig(config));<a name="line.27"></a>
-<span class="sourceLineNo">028</span>        }<a name="line.28"></a>
-<span class="sourceLineNo">029</span>    }<a name="line.29"></a>
-<span class="sourceLineNo">030</span><a name="line.30"></a>
-<span class="sourceLineNo">031</span>    @Override<a name="line.31"></a>
-<span class="sourceLineNo">032</span>    public Collector.MetricFamilySamples.Sample createSample(final String dropwizardName, final String nameSuffix, final List&lt;String&gt; additionalLabelNames, final List&lt;String&gt; additionalLabelValues, final double value) {<a name="line.32"></a>
-<span class="sourceLineNo">033</span>        if (dropwizardName == null) {<a name="line.33"></a>
-<span class="sourceLineNo">034</span>            throw new IllegalArgumentException("Dropwizard metric name cannot be null");<a name="line.34"></a>
-<span class="sourceLineNo">035</span>        }<a name="line.35"></a>
-<span class="sourceLineNo">036</span><a name="line.36"></a>
-<span class="sourceLineNo">037</span>        CompiledMapperConfig matchingConfig = null;<a name="line.37"></a>
-<span class="sourceLineNo">038</span>        for (CompiledMapperConfig config : this.compiledMapperConfigs) {<a name="line.38"></a>
-<span class="sourceLineNo">039</span>            if (config.pattern.matches(dropwizardName)) {<a name="line.39"></a>
-<span class="sourceLineNo">040</span>                matchingConfig = config;<a name="line.40"></a>
-<span class="sourceLineNo">041</span>                break;<a name="line.41"></a>
-<span class="sourceLineNo">042</span>            }<a name="line.42"></a>
-<span class="sourceLineNo">043</span>        }<a name="line.43"></a>
-<span class="sourceLineNo">044</span><a name="line.44"></a>
-<span class="sourceLineNo">045</span>        if (matchingConfig != null) {<a name="line.45"></a>
-<span class="sourceLineNo">046</span>            final Map&lt;String, String&gt; params = matchingConfig.pattern.extractParameters(dropwizardName);<a name="line.46"></a>
-<span class="sourceLineNo">047</span>            final NameAndLabels nameAndLabels = getNameAndLabels(matchingConfig.mapperConfig, params);<a name="line.47"></a>
-<span class="sourceLineNo">048</span>            nameAndLabels.labelNames.addAll(additionalLabelNames);<a name="line.48"></a>
-<span class="sourceLineNo">049</span>            nameAndLabels.labelValues.addAll(additionalLabelValues);<a name="line.49"></a>
-<span class="sourceLineNo">050</span>            return defaultMetricSampleBuilder.createSample(<a name="line.50"></a>
-<span class="sourceLineNo">051</span>                    nameAndLabels.name, nameSuffix,<a name="line.51"></a>
-<span class="sourceLineNo">052</span>                    nameAndLabels.labelNames,<a name="line.52"></a>
-<span class="sourceLineNo">053</span>                    nameAndLabels.labelValues,<a name="line.53"></a>
-<span class="sourceLineNo">054</span>                    value<a name="line.54"></a>
-<span class="sourceLineNo">055</span>            );<a name="line.55"></a>
-<span class="sourceLineNo">056</span>        }<a name="line.56"></a>
-<span class="sourceLineNo">057</span><a name="line.57"></a>
-<span class="sourceLineNo">058</span><a name="line.58"></a>
-<span class="sourceLineNo">059</span>        return defaultMetricSampleBuilder.createSample(<a name="line.59"></a>
-<span class="sourceLineNo">060</span>                dropwizardName, nameSuffix,<a name="line.60"></a>
-<span class="sourceLineNo">061</span>                additionalLabelNames,<a name="line.61"></a>
-<span class="sourceLineNo">062</span>                additionalLabelValues,<a name="line.62"></a>
-<span class="sourceLineNo">063</span>                value<a name="line.63"></a>
-<span class="sourceLineNo">064</span>        );<a name="line.64"></a>
-<span class="sourceLineNo">065</span>    }<a name="line.65"></a>
-<span class="sourceLineNo">066</span><a name="line.66"></a>
-<span class="sourceLineNo">067</span>    protected NameAndLabels getNameAndLabels(final MapperConfig config, final Map&lt;String, String&gt; parameters) {<a name="line.67"></a>
-<span class="sourceLineNo">068</span>        final String metricName = formatTemplate(config.getName(), parameters);<a name="line.68"></a>
-<span class="sourceLineNo">069</span>        final List&lt;String&gt; labels = new ArrayList&lt;String&gt;(config.getLabels().size());<a name="line.69"></a>
-<span class="sourceLineNo">070</span>        final List&lt;String&gt; labelValues = new ArrayList&lt;String&gt;(config.getLabels().size());<a name="line.70"></a>
-<span class="sourceLineNo">071</span>        for (Map.Entry&lt;String, String&gt; entry : config.getLabels().entrySet()) {<a name="line.71"></a>
-<span class="sourceLineNo">072</span>            labels.add(entry.getKey());<a name="line.72"></a>
-<span class="sourceLineNo">073</span>            labelValues.add(formatTemplate(entry.getValue(), parameters));<a name="line.73"></a>
-<span class="sourceLineNo">074</span>        }<a name="line.74"></a>
-<span class="sourceLineNo">075</span><a name="line.75"></a>
-<span class="sourceLineNo">076</span>        return new NameAndLabels(metricName, labels, labelValues);<a name="line.76"></a>
-<span class="sourceLineNo">077</span>    }<a name="line.77"></a>
-<span class="sourceLineNo">078</span><a name="line.78"></a>
-<span class="sourceLineNo">079</span>    private String formatTemplate(final String template, final Map&lt;String, String&gt; params) {<a name="line.79"></a>
-<span class="sourceLineNo">080</span>        String result = template;<a name="line.80"></a>
-<span class="sourceLineNo">081</span>        for (Map.Entry&lt;String, String&gt; entry : params.entrySet()) {<a name="line.81"></a>
-<span class="sourceLineNo">082</span>            result = result.replace(entry.getKey(), entry.getValue());<a name="line.82"></a>
-<span class="sourceLineNo">083</span>        }<a name="line.83"></a>
-<span class="sourceLineNo">084</span><a name="line.84"></a>
-<span class="sourceLineNo">085</span>        return result;<a name="line.85"></a>
-<span class="sourceLineNo">086</span>    }<a name="line.86"></a>
-<span class="sourceLineNo">087</span><a name="line.87"></a>
-<span class="sourceLineNo">088</span>    static class CompiledMapperConfig {<a name="line.88"></a>
-<span class="sourceLineNo">089</span>        final MapperConfig mapperConfig;<a name="line.89"></a>
-<span class="sourceLineNo">090</span>        final GraphiteNamePattern pattern;<a name="line.90"></a>
-<span class="sourceLineNo">091</span><a name="line.91"></a>
-<span class="sourceLineNo">092</span>        CompiledMapperConfig(final MapperConfig mapperConfig) {<a name="line.92"></a>
-<span class="sourceLineNo">093</span>            this.mapperConfig = mapperConfig;<a name="line.93"></a>
-<span class="sourceLineNo">094</span>            this.pattern = new GraphiteNamePattern(mapperConfig.getMatch());<a name="line.94"></a>
-<span class="sourceLineNo">095</span>        }<a name="line.95"></a>
-<span class="sourceLineNo">096</span>    }<a name="line.96"></a>
-<span class="sourceLineNo">097</span><a name="line.97"></a>
-<span class="sourceLineNo">098</span>    static class NameAndLabels {<a name="line.98"></a>
-<span class="sourceLineNo">099</span>        final String name;<a name="line.99"></a>
-<span class="sourceLineNo">100</span>        final List&lt;String&gt; labelNames;<a name="line.100"></a>
-<span class="sourceLineNo">101</span>        final List&lt;String&gt; labelValues;<a name="line.101"></a>
-<span class="sourceLineNo">102</span><a name="line.102"></a>
-<span class="sourceLineNo">103</span>        NameAndLabels(final String name, final List&lt;String&gt; labelNames, final List&lt;String&gt; labelValues) {<a name="line.103"></a>
-<span class="sourceLineNo">104</span>            this.name = name;<a name="line.104"></a>
-<span class="sourceLineNo">105</span>            this.labelNames = labelNames;<a name="line.105"></a>
-<span class="sourceLineNo">106</span>            this.labelValues = labelValues;<a name="line.106"></a>
-<span class="sourceLineNo">107</span>        }<a name="line.107"></a>
-<span class="sourceLineNo">108</span>    }<a name="line.108"></a>
-<span class="sourceLineNo">109</span>}<a name="line.109"></a>
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.dropwizard.samplebuilder;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import io.prometheus.client.Collector;</a>
+<span class="sourceLineNo">004</span><a id="line.4"></a>
+<span class="sourceLineNo">005</span><a id="line.5">import java.util.ArrayList;</a>
+<span class="sourceLineNo">006</span><a id="line.6">import java.util.Collections;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import java.util.List;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import java.util.Map;</a>
+<span class="sourceLineNo">009</span><a id="line.9"></a>
+<span class="sourceLineNo">010</span><a id="line.10">/**</a>
+<span class="sourceLineNo">011</span><a id="line.11"> * Custom {@link SampleBuilder} implementation to allow Dropwizard metrics to be translated to Prometheus metrics including custom labels and names.</a>
+<span class="sourceLineNo">012</span><a id="line.12"> * Prometheus metric name and labels are extracted from the Dropwizard name based on the provided list of {@link MapperConfig}s.</a>
+<span class="sourceLineNo">013</span><a id="line.13"> * The FIRST matching config will be used.</a>
+<span class="sourceLineNo">014</span><a id="line.14"> * If no config is matched, the {@link DefaultSampleBuilder} is used.</a>
+<span class="sourceLineNo">015</span><a id="line.15"> */</a>
+<span class="sourceLineNo">016</span><a id="line.16">public class CustomMappingSampleBuilder implements SampleBuilder {</a>
+<span class="sourceLineNo">017</span><a id="line.17">    private final List&lt;CompiledMapperConfig&gt; compiledMapperConfigs;</a>
+<span class="sourceLineNo">018</span><a id="line.18">    private final DefaultSampleBuilder defaultMetricSampleBuilder = new DefaultSampleBuilder();</a>
+<span class="sourceLineNo">019</span><a id="line.19"></a>
+<span class="sourceLineNo">020</span><a id="line.20">    public CustomMappingSampleBuilder(final List&lt;MapperConfig&gt; mapperConfigs) {</a>
+<span class="sourceLineNo">021</span><a id="line.21">        if (mapperConfigs == null || mapperConfigs.isEmpty()) {</a>
+<span class="sourceLineNo">022</span><a id="line.22">            throw new IllegalArgumentException("CustomMappingSampleBuilder needs some mapper configs!");</a>
+<span class="sourceLineNo">023</span><a id="line.23">        }</a>
+<span class="sourceLineNo">024</span><a id="line.24"></a>
+<span class="sourceLineNo">025</span><a id="line.25">        this.compiledMapperConfigs = new ArrayList&lt;CompiledMapperConfig&gt;(mapperConfigs.size());</a>
+<span class="sourceLineNo">026</span><a id="line.26">        for (MapperConfig config : mapperConfigs) {</a>
+<span class="sourceLineNo">027</span><a id="line.27">            this.compiledMapperConfigs.add(new CompiledMapperConfig(config));</a>
+<span class="sourceLineNo">028</span><a id="line.28">        }</a>
+<span class="sourceLineNo">029</span><a id="line.29">    }</a>
+<span class="sourceLineNo">030</span><a id="line.30"></a>
+<span class="sourceLineNo">031</span><a id="line.31">    @Override</a>
+<span class="sourceLineNo">032</span><a id="line.32">    public Collector.MetricFamilySamples.Sample createSample(final String dropwizardName, final String nameSuffix, final List&lt;String&gt; additionalLabelNames, final List&lt;String&gt; additionalLabelValues, final double value) {</a>
+<span class="sourceLineNo">033</span><a id="line.33">        if (dropwizardName == null) {</a>
+<span class="sourceLineNo">034</span><a id="line.34">            throw new IllegalArgumentException("Dropwizard metric name cannot be null");</a>
+<span class="sourceLineNo">035</span><a id="line.35">        }</a>
+<span class="sourceLineNo">036</span><a id="line.36"></a>
+<span class="sourceLineNo">037</span><a id="line.37">        CompiledMapperConfig matchingConfig = null;</a>
+<span class="sourceLineNo">038</span><a id="line.38">        for (CompiledMapperConfig config : this.compiledMapperConfigs) {</a>
+<span class="sourceLineNo">039</span><a id="line.39">            if (config.pattern.matches(dropwizardName)) {</a>
+<span class="sourceLineNo">040</span><a id="line.40">                matchingConfig = config;</a>
+<span class="sourceLineNo">041</span><a id="line.41">                break;</a>
+<span class="sourceLineNo">042</span><a id="line.42">            }</a>
+<span class="sourceLineNo">043</span><a id="line.43">        }</a>
+<span class="sourceLineNo">044</span><a id="line.44"></a>
+<span class="sourceLineNo">045</span><a id="line.45">        if (matchingConfig != null) {</a>
+<span class="sourceLineNo">046</span><a id="line.46">            final Map&lt;String, String&gt; params = matchingConfig.pattern.extractParameters(dropwizardName);</a>
+<span class="sourceLineNo">047</span><a id="line.47">            final NameAndLabels nameAndLabels = getNameAndLabels(matchingConfig.mapperConfig, params);</a>
+<span class="sourceLineNo">048</span><a id="line.48">            nameAndLabels.labelNames.addAll(additionalLabelNames);</a>
+<span class="sourceLineNo">049</span><a id="line.49">            nameAndLabels.labelValues.addAll(additionalLabelValues);</a>
+<span class="sourceLineNo">050</span><a id="line.50">            return defaultMetricSampleBuilder.createSample(</a>
+<span class="sourceLineNo">051</span><a id="line.51">                    nameAndLabels.name, nameSuffix,</a>
+<span class="sourceLineNo">052</span><a id="line.52">                    nameAndLabels.labelNames,</a>
+<span class="sourceLineNo">053</span><a id="line.53">                    nameAndLabels.labelValues,</a>
+<span class="sourceLineNo">054</span><a id="line.54">                    value</a>
+<span class="sourceLineNo">055</span><a id="line.55">            );</a>
+<span class="sourceLineNo">056</span><a id="line.56">        }</a>
+<span class="sourceLineNo">057</span><a id="line.57"></a>
+<span class="sourceLineNo">058</span><a id="line.58"></a>
+<span class="sourceLineNo">059</span><a id="line.59">        return defaultMetricSampleBuilder.createSample(</a>
+<span class="sourceLineNo">060</span><a id="line.60">                dropwizardName, nameSuffix,</a>
+<span class="sourceLineNo">061</span><a id="line.61">                additionalLabelNames,</a>
+<span class="sourceLineNo">062</span><a id="line.62">                additionalLabelValues,</a>
+<span class="sourceLineNo">063</span><a id="line.63">                value</a>
+<span class="sourceLineNo">064</span><a id="line.64">        );</a>
+<span class="sourceLineNo">065</span><a id="line.65">    }</a>
+<span class="sourceLineNo">066</span><a id="line.66"></a>
+<span class="sourceLineNo">067</span><a id="line.67">    protected NameAndLabels getNameAndLabels(final MapperConfig config, final Map&lt;String, String&gt; parameters) {</a>
+<span class="sourceLineNo">068</span><a id="line.68">        final String metricName = formatTemplate(config.getName(), parameters);</a>
+<span class="sourceLineNo">069</span><a id="line.69">        final List&lt;String&gt; labels = new ArrayList&lt;String&gt;(config.getLabels().size());</a>
+<span class="sourceLineNo">070</span><a id="line.70">        final List&lt;String&gt; labelValues = new ArrayList&lt;String&gt;(config.getLabels().size());</a>
+<span class="sourceLineNo">071</span><a id="line.71">        for (Map.Entry&lt;String, String&gt; entry : config.getLabels().entrySet()) {</a>
+<span class="sourceLineNo">072</span><a id="line.72">            labels.add(entry.getKey());</a>
+<span class="sourceLineNo">073</span><a id="line.73">            labelValues.add(formatTemplate(entry.getValue(), parameters));</a>
+<span class="sourceLineNo">074</span><a id="line.74">        }</a>
+<span class="sourceLineNo">075</span><a id="line.75"></a>
+<span class="sourceLineNo">076</span><a id="line.76">        return new NameAndLabels(metricName, labels, labelValues);</a>
+<span class="sourceLineNo">077</span><a id="line.77">    }</a>
+<span class="sourceLineNo">078</span><a id="line.78"></a>
+<span class="sourceLineNo">079</span><a id="line.79">    private String formatTemplate(final String template, final Map&lt;String, String&gt; params) {</a>
+<span class="sourceLineNo">080</span><a id="line.80">        String result = template;</a>
+<span class="sourceLineNo">081</span><a id="line.81">        for (Map.Entry&lt;String, String&gt; entry : params.entrySet()) {</a>
+<span class="sourceLineNo">082</span><a id="line.82">            result = result.replace(entry.getKey(), entry.getValue());</a>
+<span class="sourceLineNo">083</span><a id="line.83">        }</a>
+<span class="sourceLineNo">084</span><a id="line.84"></a>
+<span class="sourceLineNo">085</span><a id="line.85">        return result;</a>
+<span class="sourceLineNo">086</span><a id="line.86">    }</a>
+<span class="sourceLineNo">087</span><a id="line.87"></a>
+<span class="sourceLineNo">088</span><a id="line.88">    static class CompiledMapperConfig {</a>
+<span class="sourceLineNo">089</span><a id="line.89">        final MapperConfig mapperConfig;</a>
+<span class="sourceLineNo">090</span><a id="line.90">        final GraphiteNamePattern pattern;</a>
+<span class="sourceLineNo">091</span><a id="line.91"></a>
+<span class="sourceLineNo">092</span><a id="line.92">        CompiledMapperConfig(final MapperConfig mapperConfig) {</a>
+<span class="sourceLineNo">093</span><a id="line.93">            this.mapperConfig = mapperConfig;</a>
+<span class="sourceLineNo">094</span><a id="line.94">            this.pattern = new GraphiteNamePattern(mapperConfig.getMatch());</a>
+<span class="sourceLineNo">095</span><a id="line.95">        }</a>
+<span class="sourceLineNo">096</span><a id="line.96">    }</a>
+<span class="sourceLineNo">097</span><a id="line.97"></a>
+<span class="sourceLineNo">098</span><a id="line.98">    static class NameAndLabels {</a>
+<span class="sourceLineNo">099</span><a id="line.99">        final String name;</a>
+<span class="sourceLineNo">100</span><a id="line.100">        final List&lt;String&gt; labelNames;</a>
+<span class="sourceLineNo">101</span><a id="line.101">        final List&lt;String&gt; labelValues;</a>
+<span class="sourceLineNo">102</span><a id="line.102"></a>
+<span class="sourceLineNo">103</span><a id="line.103">        NameAndLabels(final String name, final List&lt;String&gt; labelNames, final List&lt;String&gt; labelValues) {</a>
+<span class="sourceLineNo">104</span><a id="line.104">            this.name = name;</a>
+<span class="sourceLineNo">105</span><a id="line.105">            this.labelNames = labelNames;</a>
+<span class="sourceLineNo">106</span><a id="line.106">            this.labelValues = labelValues;</a>
+<span class="sourceLineNo">107</span><a id="line.107">        }</a>
+<span class="sourceLineNo">108</span><a id="line.108">    }</a>
+<span class="sourceLineNo">109</span><a id="line.109">}</a>
 
 
 
@@ -177,5 +178,6 @@
 
 </pre>
 </div>
+</main>
 </body>
 </html>

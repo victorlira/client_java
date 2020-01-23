@@ -1,153 +1,154 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!DOCTYPE HTML>
 <html lang="en">
 <head>
 <title>Source code</title>
 <link rel="stylesheet" type="text/css" href="../../../../../../stylesheet.css" title="Style">
 </head>
 <body>
+<main role="main">
 <div class="sourceContainer">
-<pre><span class="sourceLineNo">001</span>package io.prometheus.client.guava.cache;<a name="line.1"></a>
-<span class="sourceLineNo">002</span><a name="line.2"></a>
-<span class="sourceLineNo">003</span>import com.google.common.cache.Cache;<a name="line.3"></a>
-<span class="sourceLineNo">004</span>import com.google.common.cache.CacheStats;<a name="line.4"></a>
-<span class="sourceLineNo">005</span>import com.google.common.cache.LoadingCache;<a name="line.5"></a>
-<span class="sourceLineNo">006</span>import io.prometheus.client.Collector;<a name="line.6"></a>
-<span class="sourceLineNo">007</span>import io.prometheus.client.CounterMetricFamily;<a name="line.7"></a>
-<span class="sourceLineNo">008</span>import io.prometheus.client.GaugeMetricFamily;<a name="line.8"></a>
-<span class="sourceLineNo">009</span>import io.prometheus.client.SummaryMetricFamily;<a name="line.9"></a>
-<span class="sourceLineNo">010</span><a name="line.10"></a>
-<span class="sourceLineNo">011</span>import java.util.ArrayList;<a name="line.11"></a>
-<span class="sourceLineNo">012</span>import java.util.Arrays;<a name="line.12"></a>
-<span class="sourceLineNo">013</span>import java.util.List;<a name="line.13"></a>
-<span class="sourceLineNo">014</span>import java.util.Map;<a name="line.14"></a>
-<span class="sourceLineNo">015</span>import java.util.concurrent.ConcurrentHashMap;<a name="line.15"></a>
-<span class="sourceLineNo">016</span>import java.util.concurrent.ConcurrentMap;<a name="line.16"></a>
-<span class="sourceLineNo">017</span><a name="line.17"></a>
-<span class="sourceLineNo">018</span>/**<a name="line.18"></a>
-<span class="sourceLineNo">019</span> * Collect metrics from Guava's com.google.common.cache.Cache.<a name="line.19"></a>
-<span class="sourceLineNo">020</span> * &lt;p&gt;<a name="line.20"></a>
-<span class="sourceLineNo">021</span> * &lt;pre&gt;{@code<a name="line.21"></a>
-<span class="sourceLineNo">022</span> *<a name="line.22"></a>
-<span class="sourceLineNo">023</span> * // Note that `recordStats()` is required to gather non-zero statistics<a name="line.23"></a>
-<span class="sourceLineNo">024</span> * Cache&lt;String, String&gt; cache = CacheBuilder.newBuilder().recordStats().build();<a name="line.24"></a>
-<span class="sourceLineNo">025</span> * CacheMetricsCollector cacheMetrics = new CacheMetricsCollector().register();<a name="line.25"></a>
-<span class="sourceLineNo">026</span> * cacheMetrics.addCache("mycache", cache);<a name="line.26"></a>
-<span class="sourceLineNo">027</span> *<a name="line.27"></a>
-<span class="sourceLineNo">028</span> * }&lt;/pre&gt;<a name="line.28"></a>
-<span class="sourceLineNo">029</span> *<a name="line.29"></a>
-<span class="sourceLineNo">030</span> * Exposed metrics are labeled with the provided cache name.<a name="line.30"></a>
-<span class="sourceLineNo">031</span> *<a name="line.31"></a>
-<span class="sourceLineNo">032</span> * With the example above, sample metric names would be:<a name="line.32"></a>
-<span class="sourceLineNo">033</span> * &lt;pre&gt;<a name="line.33"></a>
-<span class="sourceLineNo">034</span> *     guava_cache_hit_total{cache="mycache"} 10.0<a name="line.34"></a>
-<span class="sourceLineNo">035</span> *     guava_cache_miss_total{cache="mycache"} 3.0<a name="line.35"></a>
-<span class="sourceLineNo">036</span> *     guava_cache_requests_total{cache="mycache"} 13.0<a name="line.36"></a>
-<span class="sourceLineNo">037</span> *     guava_cache_eviction_total{cache="mycache"} 1.0<a name="line.37"></a>
-<span class="sourceLineNo">038</span> *     guava_cache_size{cache="mycache"} 5.0<a name="line.38"></a>
-<span class="sourceLineNo">039</span> * &lt;/pre&gt;<a name="line.39"></a>
-<span class="sourceLineNo">040</span> *<a name="line.40"></a>
-<span class="sourceLineNo">041</span> * Additionally if the cache includes a loader, the following metrics would be provided:<a name="line.41"></a>
-<span class="sourceLineNo">042</span> * &lt;pre&gt;<a name="line.42"></a>
-<span class="sourceLineNo">043</span> *     guava_cache_load_failure_total{cache="mycache"} 2.0<a name="line.43"></a>
-<span class="sourceLineNo">044</span> *     guava_cache_loads_total{cache="mycache"} 7.0<a name="line.44"></a>
-<span class="sourceLineNo">045</span> *     guava_cache_load_duration_seconds_count{cache="mycache"} 7.0<a name="line.45"></a>
-<span class="sourceLineNo">046</span> *     guava_cache_load_duration_seconds_sum{cache="mycache"} 0.0034<a name="line.46"></a>
-<span class="sourceLineNo">047</span> * &lt;/pre&gt;<a name="line.47"></a>
-<span class="sourceLineNo">048</span> *<a name="line.48"></a>
-<span class="sourceLineNo">049</span> */<a name="line.49"></a>
-<span class="sourceLineNo">050</span>public class CacheMetricsCollector extends Collector {<a name="line.50"></a>
-<span class="sourceLineNo">051</span><a name="line.51"></a>
-<span class="sourceLineNo">052</span>    protected final ConcurrentMap&lt;String, Cache&gt; children = new ConcurrentHashMap&lt;String, Cache&gt;();<a name="line.52"></a>
-<span class="sourceLineNo">053</span><a name="line.53"></a>
-<span class="sourceLineNo">054</span>    /**<a name="line.54"></a>
-<span class="sourceLineNo">055</span>     * Add or replace the cache with the given name.<a name="line.55"></a>
-<span class="sourceLineNo">056</span>     * &lt;p&gt;<a name="line.56"></a>
-<span class="sourceLineNo">057</span>     * Any references any previous cache with this name is invalidated.<a name="line.57"></a>
-<span class="sourceLineNo">058</span>     *<a name="line.58"></a>
-<span class="sourceLineNo">059</span>     * @param cacheName The name of the cache, will be the metrics label value<a name="line.59"></a>
-<span class="sourceLineNo">060</span>     * @param cache The cache being monitored<a name="line.60"></a>
-<span class="sourceLineNo">061</span>     */<a name="line.61"></a>
-<span class="sourceLineNo">062</span>    public void addCache(String cacheName, Cache cache) {<a name="line.62"></a>
-<span class="sourceLineNo">063</span>        children.put(cacheName, cache);<a name="line.63"></a>
-<span class="sourceLineNo">064</span>    }<a name="line.64"></a>
-<span class="sourceLineNo">065</span><a name="line.65"></a>
-<span class="sourceLineNo">066</span>    /**<a name="line.66"></a>
-<span class="sourceLineNo">067</span>     * Remove the cache with the given name.<a name="line.67"></a>
-<span class="sourceLineNo">068</span>     * &lt;p&gt;<a name="line.68"></a>
-<span class="sourceLineNo">069</span>     * Any references to the cache are invalidated.<a name="line.69"></a>
-<span class="sourceLineNo">070</span>     *<a name="line.70"></a>
-<span class="sourceLineNo">071</span>     * @param cacheName cache to be removed<a name="line.71"></a>
-<span class="sourceLineNo">072</span>     */<a name="line.72"></a>
-<span class="sourceLineNo">073</span>    public Cache removeCache(String cacheName) {<a name="line.73"></a>
-<span class="sourceLineNo">074</span>        return children.remove(cacheName);<a name="line.74"></a>
-<span class="sourceLineNo">075</span>    }<a name="line.75"></a>
-<span class="sourceLineNo">076</span><a name="line.76"></a>
-<span class="sourceLineNo">077</span>    /**<a name="line.77"></a>
-<span class="sourceLineNo">078</span>     * Remove all caches.<a name="line.78"></a>
-<span class="sourceLineNo">079</span>     * &lt;p&gt;<a name="line.79"></a>
-<span class="sourceLineNo">080</span>     * Any references to all caches are invalidated.<a name="line.80"></a>
-<span class="sourceLineNo">081</span>     */<a name="line.81"></a>
-<span class="sourceLineNo">082</span>    public void clear(){<a name="line.82"></a>
-<span class="sourceLineNo">083</span>        children.clear();<a name="line.83"></a>
-<span class="sourceLineNo">084</span>    }<a name="line.84"></a>
-<span class="sourceLineNo">085</span><a name="line.85"></a>
-<span class="sourceLineNo">086</span>    @Override<a name="line.86"></a>
-<span class="sourceLineNo">087</span>    public List&lt;MetricFamilySamples&gt; collect() {<a name="line.87"></a>
-<span class="sourceLineNo">088</span>        List&lt;MetricFamilySamples&gt; mfs = new ArrayList&lt;MetricFamilySamples&gt;();<a name="line.88"></a>
-<span class="sourceLineNo">089</span>        List&lt;String&gt; labelNames = Arrays.asList("cache");<a name="line.89"></a>
-<span class="sourceLineNo">090</span><a name="line.90"></a>
-<span class="sourceLineNo">091</span>        CounterMetricFamily cacheHitTotal = new CounterMetricFamily("guava_cache_hit_total",<a name="line.91"></a>
-<span class="sourceLineNo">092</span>                "Cache hit totals", labelNames);<a name="line.92"></a>
-<span class="sourceLineNo">093</span>        mfs.add(cacheHitTotal);<a name="line.93"></a>
-<span class="sourceLineNo">094</span><a name="line.94"></a>
-<span class="sourceLineNo">095</span>        CounterMetricFamily cacheMissTotal = new CounterMetricFamily("guava_cache_miss_total",<a name="line.95"></a>
-<span class="sourceLineNo">096</span>                "Cache miss totals", labelNames);<a name="line.96"></a>
-<span class="sourceLineNo">097</span>        mfs.add(cacheMissTotal);<a name="line.97"></a>
-<span class="sourceLineNo">098</span><a name="line.98"></a>
-<span class="sourceLineNo">099</span>        CounterMetricFamily cacheRequestsTotal = new CounterMetricFamily("guava_cache_requests_total",<a name="line.99"></a>
-<span class="sourceLineNo">100</span>                "Cache request totals, hits + misses", labelNames);<a name="line.100"></a>
-<span class="sourceLineNo">101</span>        mfs.add(cacheRequestsTotal);<a name="line.101"></a>
-<span class="sourceLineNo">102</span><a name="line.102"></a>
-<span class="sourceLineNo">103</span>        CounterMetricFamily cacheEvictionTotal = new CounterMetricFamily("guava_cache_eviction_total",<a name="line.103"></a>
-<span class="sourceLineNo">104</span>                "Cache eviction totals, doesn't include manually removed entries", labelNames);<a name="line.104"></a>
-<span class="sourceLineNo">105</span>        mfs.add(cacheEvictionTotal);<a name="line.105"></a>
-<span class="sourceLineNo">106</span><a name="line.106"></a>
-<span class="sourceLineNo">107</span>        CounterMetricFamily cacheLoadFailure = new CounterMetricFamily("guava_cache_load_failure_total",<a name="line.107"></a>
-<span class="sourceLineNo">108</span>                "Cache load failures", labelNames);<a name="line.108"></a>
-<span class="sourceLineNo">109</span>        mfs.add(cacheLoadFailure);<a name="line.109"></a>
-<span class="sourceLineNo">110</span><a name="line.110"></a>
-<span class="sourceLineNo">111</span>        CounterMetricFamily cacheLoadTotal = new CounterMetricFamily("guava_cache_loads_total",<a name="line.111"></a>
-<span class="sourceLineNo">112</span>                "Cache loads: both success and failures", labelNames);<a name="line.112"></a>
-<span class="sourceLineNo">113</span>        mfs.add(cacheLoadTotal);<a name="line.113"></a>
-<span class="sourceLineNo">114</span><a name="line.114"></a>
-<span class="sourceLineNo">115</span>        GaugeMetricFamily cacheSize = new GaugeMetricFamily("guava_cache_size",<a name="line.115"></a>
-<span class="sourceLineNo">116</span>                "Cache size", labelNames);<a name="line.116"></a>
-<span class="sourceLineNo">117</span>        mfs.add(cacheSize);<a name="line.117"></a>
-<span class="sourceLineNo">118</span><a name="line.118"></a>
-<span class="sourceLineNo">119</span>        SummaryMetricFamily cacheLoadSummary = new SummaryMetricFamily("guava_cache_load_duration_seconds",<a name="line.119"></a>
-<span class="sourceLineNo">120</span>                "Cache load duration: both success and failures", labelNames);<a name="line.120"></a>
-<span class="sourceLineNo">121</span>        mfs.add(cacheLoadSummary);<a name="line.121"></a>
-<span class="sourceLineNo">122</span><a name="line.122"></a>
-<span class="sourceLineNo">123</span>        for(Map.Entry&lt;String, Cache&gt; c: children.entrySet()) {<a name="line.123"></a>
-<span class="sourceLineNo">124</span>            List&lt;String&gt; cacheName = Arrays.asList(c.getKey());<a name="line.124"></a>
-<span class="sourceLineNo">125</span>            CacheStats stats = c.getValue().stats();<a name="line.125"></a>
-<span class="sourceLineNo">126</span><a name="line.126"></a>
-<span class="sourceLineNo">127</span>            cacheHitTotal.addMetric(cacheName, stats.hitCount());<a name="line.127"></a>
-<span class="sourceLineNo">128</span>            cacheMissTotal.addMetric(cacheName, stats.missCount());<a name="line.128"></a>
-<span class="sourceLineNo">129</span>            cacheRequestsTotal.addMetric(cacheName, stats.requestCount());<a name="line.129"></a>
-<span class="sourceLineNo">130</span>            cacheEvictionTotal.addMetric(cacheName, stats.evictionCount());<a name="line.130"></a>
-<span class="sourceLineNo">131</span>            cacheSize.addMetric(cacheName, c.getValue().size());<a name="line.131"></a>
-<span class="sourceLineNo">132</span><a name="line.132"></a>
-<span class="sourceLineNo">133</span>            if(c.getValue() instanceof LoadingCache) {<a name="line.133"></a>
-<span class="sourceLineNo">134</span>                cacheLoadFailure.addMetric(cacheName, stats.loadExceptionCount());<a name="line.134"></a>
-<span class="sourceLineNo">135</span>                cacheLoadTotal.addMetric(cacheName, stats.loadCount());<a name="line.135"></a>
-<span class="sourceLineNo">136</span><a name="line.136"></a>
-<span class="sourceLineNo">137</span>                cacheLoadSummary.addMetric(cacheName, stats.loadCount(), stats.totalLoadTime() / Collector.NANOSECONDS_PER_SECOND);<a name="line.137"></a>
-<span class="sourceLineNo">138</span>            }<a name="line.138"></a>
-<span class="sourceLineNo">139</span>        }<a name="line.139"></a>
-<span class="sourceLineNo">140</span>        return mfs;<a name="line.140"></a>
-<span class="sourceLineNo">141</span>    }<a name="line.141"></a>
-<span class="sourceLineNo">142</span>}<a name="line.142"></a>
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.guava.cache;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import com.google.common.cache.Cache;</a>
+<span class="sourceLineNo">004</span><a id="line.4">import com.google.common.cache.CacheStats;</a>
+<span class="sourceLineNo">005</span><a id="line.5">import com.google.common.cache.LoadingCache;</a>
+<span class="sourceLineNo">006</span><a id="line.6">import io.prometheus.client.Collector;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import io.prometheus.client.CounterMetricFamily;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import io.prometheus.client.GaugeMetricFamily;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import io.prometheus.client.SummaryMetricFamily;</a>
+<span class="sourceLineNo">010</span><a id="line.10"></a>
+<span class="sourceLineNo">011</span><a id="line.11">import java.util.ArrayList;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import java.util.Arrays;</a>
+<span class="sourceLineNo">013</span><a id="line.13">import java.util.List;</a>
+<span class="sourceLineNo">014</span><a id="line.14">import java.util.Map;</a>
+<span class="sourceLineNo">015</span><a id="line.15">import java.util.concurrent.ConcurrentHashMap;</a>
+<span class="sourceLineNo">016</span><a id="line.16">import java.util.concurrent.ConcurrentMap;</a>
+<span class="sourceLineNo">017</span><a id="line.17"></a>
+<span class="sourceLineNo">018</span><a id="line.18">/**</a>
+<span class="sourceLineNo">019</span><a id="line.19"> * Collect metrics from Guava's com.google.common.cache.Cache.</a>
+<span class="sourceLineNo">020</span><a id="line.20"> * &lt;p&gt;</a>
+<span class="sourceLineNo">021</span><a id="line.21"> * &lt;pre&gt;{@code</a>
+<span class="sourceLineNo">022</span><a id="line.22"> *</a>
+<span class="sourceLineNo">023</span><a id="line.23"> * // Note that `recordStats()` is required to gather non-zero statistics</a>
+<span class="sourceLineNo">024</span><a id="line.24"> * Cache&lt;String, String&gt; cache = CacheBuilder.newBuilder().recordStats().build();</a>
+<span class="sourceLineNo">025</span><a id="line.25"> * CacheMetricsCollector cacheMetrics = new CacheMetricsCollector().register();</a>
+<span class="sourceLineNo">026</span><a id="line.26"> * cacheMetrics.addCache("mycache", cache);</a>
+<span class="sourceLineNo">027</span><a id="line.27"> *</a>
+<span class="sourceLineNo">028</span><a id="line.28"> * }&lt;/pre&gt;</a>
+<span class="sourceLineNo">029</span><a id="line.29"> *</a>
+<span class="sourceLineNo">030</span><a id="line.30"> * Exposed metrics are labeled with the provided cache name.</a>
+<span class="sourceLineNo">031</span><a id="line.31"> *</a>
+<span class="sourceLineNo">032</span><a id="line.32"> * With the example above, sample metric names would be:</a>
+<span class="sourceLineNo">033</span><a id="line.33"> * &lt;pre&gt;</a>
+<span class="sourceLineNo">034</span><a id="line.34"> *     guava_cache_hit_total{cache="mycache"} 10.0</a>
+<span class="sourceLineNo">035</span><a id="line.35"> *     guava_cache_miss_total{cache="mycache"} 3.0</a>
+<span class="sourceLineNo">036</span><a id="line.36"> *     guava_cache_requests_total{cache="mycache"} 13.0</a>
+<span class="sourceLineNo">037</span><a id="line.37"> *     guava_cache_eviction_total{cache="mycache"} 1.0</a>
+<span class="sourceLineNo">038</span><a id="line.38"> *     guava_cache_size{cache="mycache"} 5.0</a>
+<span class="sourceLineNo">039</span><a id="line.39"> * &lt;/pre&gt;</a>
+<span class="sourceLineNo">040</span><a id="line.40"> *</a>
+<span class="sourceLineNo">041</span><a id="line.41"> * Additionally if the cache includes a loader, the following metrics would be provided:</a>
+<span class="sourceLineNo">042</span><a id="line.42"> * &lt;pre&gt;</a>
+<span class="sourceLineNo">043</span><a id="line.43"> *     guava_cache_load_failure_total{cache="mycache"} 2.0</a>
+<span class="sourceLineNo">044</span><a id="line.44"> *     guava_cache_loads_total{cache="mycache"} 7.0</a>
+<span class="sourceLineNo">045</span><a id="line.45"> *     guava_cache_load_duration_seconds_count{cache="mycache"} 7.0</a>
+<span class="sourceLineNo">046</span><a id="line.46"> *     guava_cache_load_duration_seconds_sum{cache="mycache"} 0.0034</a>
+<span class="sourceLineNo">047</span><a id="line.47"> * &lt;/pre&gt;</a>
+<span class="sourceLineNo">048</span><a id="line.48"> *</a>
+<span class="sourceLineNo">049</span><a id="line.49"> */</a>
+<span class="sourceLineNo">050</span><a id="line.50">public class CacheMetricsCollector extends Collector {</a>
+<span class="sourceLineNo">051</span><a id="line.51"></a>
+<span class="sourceLineNo">052</span><a id="line.52">    protected final ConcurrentMap&lt;String, Cache&gt; children = new ConcurrentHashMap&lt;String, Cache&gt;();</a>
+<span class="sourceLineNo">053</span><a id="line.53"></a>
+<span class="sourceLineNo">054</span><a id="line.54">    /**</a>
+<span class="sourceLineNo">055</span><a id="line.55">     * Add or replace the cache with the given name.</a>
+<span class="sourceLineNo">056</span><a id="line.56">     * &lt;p&gt;</a>
+<span class="sourceLineNo">057</span><a id="line.57">     * Any references any previous cache with this name is invalidated.</a>
+<span class="sourceLineNo">058</span><a id="line.58">     *</a>
+<span class="sourceLineNo">059</span><a id="line.59">     * @param cacheName The name of the cache, will be the metrics label value</a>
+<span class="sourceLineNo">060</span><a id="line.60">     * @param cache The cache being monitored</a>
+<span class="sourceLineNo">061</span><a id="line.61">     */</a>
+<span class="sourceLineNo">062</span><a id="line.62">    public void addCache(String cacheName, Cache cache) {</a>
+<span class="sourceLineNo">063</span><a id="line.63">        children.put(cacheName, cache);</a>
+<span class="sourceLineNo">064</span><a id="line.64">    }</a>
+<span class="sourceLineNo">065</span><a id="line.65"></a>
+<span class="sourceLineNo">066</span><a id="line.66">    /**</a>
+<span class="sourceLineNo">067</span><a id="line.67">     * Remove the cache with the given name.</a>
+<span class="sourceLineNo">068</span><a id="line.68">     * &lt;p&gt;</a>
+<span class="sourceLineNo">069</span><a id="line.69">     * Any references to the cache are invalidated.</a>
+<span class="sourceLineNo">070</span><a id="line.70">     *</a>
+<span class="sourceLineNo">071</span><a id="line.71">     * @param cacheName cache to be removed</a>
+<span class="sourceLineNo">072</span><a id="line.72">     */</a>
+<span class="sourceLineNo">073</span><a id="line.73">    public Cache removeCache(String cacheName) {</a>
+<span class="sourceLineNo">074</span><a id="line.74">        return children.remove(cacheName);</a>
+<span class="sourceLineNo">075</span><a id="line.75">    }</a>
+<span class="sourceLineNo">076</span><a id="line.76"></a>
+<span class="sourceLineNo">077</span><a id="line.77">    /**</a>
+<span class="sourceLineNo">078</span><a id="line.78">     * Remove all caches.</a>
+<span class="sourceLineNo">079</span><a id="line.79">     * &lt;p&gt;</a>
+<span class="sourceLineNo">080</span><a id="line.80">     * Any references to all caches are invalidated.</a>
+<span class="sourceLineNo">081</span><a id="line.81">     */</a>
+<span class="sourceLineNo">082</span><a id="line.82">    public void clear(){</a>
+<span class="sourceLineNo">083</span><a id="line.83">        children.clear();</a>
+<span class="sourceLineNo">084</span><a id="line.84">    }</a>
+<span class="sourceLineNo">085</span><a id="line.85"></a>
+<span class="sourceLineNo">086</span><a id="line.86">    @Override</a>
+<span class="sourceLineNo">087</span><a id="line.87">    public List&lt;MetricFamilySamples&gt; collect() {</a>
+<span class="sourceLineNo">088</span><a id="line.88">        List&lt;MetricFamilySamples&gt; mfs = new ArrayList&lt;MetricFamilySamples&gt;();</a>
+<span class="sourceLineNo">089</span><a id="line.89">        List&lt;String&gt; labelNames = Arrays.asList("cache");</a>
+<span class="sourceLineNo">090</span><a id="line.90"></a>
+<span class="sourceLineNo">091</span><a id="line.91">        CounterMetricFamily cacheHitTotal = new CounterMetricFamily("guava_cache_hit_total",</a>
+<span class="sourceLineNo">092</span><a id="line.92">                "Cache hit totals", labelNames);</a>
+<span class="sourceLineNo">093</span><a id="line.93">        mfs.add(cacheHitTotal);</a>
+<span class="sourceLineNo">094</span><a id="line.94"></a>
+<span class="sourceLineNo">095</span><a id="line.95">        CounterMetricFamily cacheMissTotal = new CounterMetricFamily("guava_cache_miss_total",</a>
+<span class="sourceLineNo">096</span><a id="line.96">                "Cache miss totals", labelNames);</a>
+<span class="sourceLineNo">097</span><a id="line.97">        mfs.add(cacheMissTotal);</a>
+<span class="sourceLineNo">098</span><a id="line.98"></a>
+<span class="sourceLineNo">099</span><a id="line.99">        CounterMetricFamily cacheRequestsTotal = new CounterMetricFamily("guava_cache_requests_total",</a>
+<span class="sourceLineNo">100</span><a id="line.100">                "Cache request totals, hits + misses", labelNames);</a>
+<span class="sourceLineNo">101</span><a id="line.101">        mfs.add(cacheRequestsTotal);</a>
+<span class="sourceLineNo">102</span><a id="line.102"></a>
+<span class="sourceLineNo">103</span><a id="line.103">        CounterMetricFamily cacheEvictionTotal = new CounterMetricFamily("guava_cache_eviction_total",</a>
+<span class="sourceLineNo">104</span><a id="line.104">                "Cache eviction totals, doesn't include manually removed entries", labelNames);</a>
+<span class="sourceLineNo">105</span><a id="line.105">        mfs.add(cacheEvictionTotal);</a>
+<span class="sourceLineNo">106</span><a id="line.106"></a>
+<span class="sourceLineNo">107</span><a id="line.107">        CounterMetricFamily cacheLoadFailure = new CounterMetricFamily("guava_cache_load_failure_total",</a>
+<span class="sourceLineNo">108</span><a id="line.108">                "Cache load failures", labelNames);</a>
+<span class="sourceLineNo">109</span><a id="line.109">        mfs.add(cacheLoadFailure);</a>
+<span class="sourceLineNo">110</span><a id="line.110"></a>
+<span class="sourceLineNo">111</span><a id="line.111">        CounterMetricFamily cacheLoadTotal = new CounterMetricFamily("guava_cache_loads_total",</a>
+<span class="sourceLineNo">112</span><a id="line.112">                "Cache loads: both success and failures", labelNames);</a>
+<span class="sourceLineNo">113</span><a id="line.113">        mfs.add(cacheLoadTotal);</a>
+<span class="sourceLineNo">114</span><a id="line.114"></a>
+<span class="sourceLineNo">115</span><a id="line.115">        GaugeMetricFamily cacheSize = new GaugeMetricFamily("guava_cache_size",</a>
+<span class="sourceLineNo">116</span><a id="line.116">                "Cache size", labelNames);</a>
+<span class="sourceLineNo">117</span><a id="line.117">        mfs.add(cacheSize);</a>
+<span class="sourceLineNo">118</span><a id="line.118"></a>
+<span class="sourceLineNo">119</span><a id="line.119">        SummaryMetricFamily cacheLoadSummary = new SummaryMetricFamily("guava_cache_load_duration_seconds",</a>
+<span class="sourceLineNo">120</span><a id="line.120">                "Cache load duration: both success and failures", labelNames);</a>
+<span class="sourceLineNo">121</span><a id="line.121">        mfs.add(cacheLoadSummary);</a>
+<span class="sourceLineNo">122</span><a id="line.122"></a>
+<span class="sourceLineNo">123</span><a id="line.123">        for(Map.Entry&lt;String, Cache&gt; c: children.entrySet()) {</a>
+<span class="sourceLineNo">124</span><a id="line.124">            List&lt;String&gt; cacheName = Arrays.asList(c.getKey());</a>
+<span class="sourceLineNo">125</span><a id="line.125">            CacheStats stats = c.getValue().stats();</a>
+<span class="sourceLineNo">126</span><a id="line.126"></a>
+<span class="sourceLineNo">127</span><a id="line.127">            cacheHitTotal.addMetric(cacheName, stats.hitCount());</a>
+<span class="sourceLineNo">128</span><a id="line.128">            cacheMissTotal.addMetric(cacheName, stats.missCount());</a>
+<span class="sourceLineNo">129</span><a id="line.129">            cacheRequestsTotal.addMetric(cacheName, stats.requestCount());</a>
+<span class="sourceLineNo">130</span><a id="line.130">            cacheEvictionTotal.addMetric(cacheName, stats.evictionCount());</a>
+<span class="sourceLineNo">131</span><a id="line.131">            cacheSize.addMetric(cacheName, c.getValue().size());</a>
+<span class="sourceLineNo">132</span><a id="line.132"></a>
+<span class="sourceLineNo">133</span><a id="line.133">            if(c.getValue() instanceof LoadingCache) {</a>
+<span class="sourceLineNo">134</span><a id="line.134">                cacheLoadFailure.addMetric(cacheName, stats.loadExceptionCount());</a>
+<span class="sourceLineNo">135</span><a id="line.135">                cacheLoadTotal.addMetric(cacheName, stats.loadCount());</a>
+<span class="sourceLineNo">136</span><a id="line.136"></a>
+<span class="sourceLineNo">137</span><a id="line.137">                cacheLoadSummary.addMetric(cacheName, stats.loadCount(), stats.totalLoadTime() / Collector.NANOSECONDS_PER_SECOND);</a>
+<span class="sourceLineNo">138</span><a id="line.138">            }</a>
+<span class="sourceLineNo">139</span><a id="line.139">        }</a>
+<span class="sourceLineNo">140</span><a id="line.140">        return mfs;</a>
+<span class="sourceLineNo">141</span><a id="line.141">    }</a>
+<span class="sourceLineNo">142</span><a id="line.142">}</a>
 
 
 
@@ -210,5 +211,6 @@
 
 </pre>
 </div>
+</main>
 </body>
 </html>
