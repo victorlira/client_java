@@ -9,7 +9,7 @@
 <div class="sourceContainer">
 <pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.cache.caffeine;</a>
 <span class="sourceLineNo">002</span><a id="line.2"></a>
-<span class="sourceLineNo">003</span><a id="line.3">import com.github.benmanes.caffeine.cache.AsyncLoadingCache;</a>
+<span class="sourceLineNo">003</span><a id="line.3">import com.github.benmanes.caffeine.cache.AsyncCache;</a>
 <span class="sourceLineNo">004</span><a id="line.4">import com.github.benmanes.caffeine.cache.Cache;</a>
 <span class="sourceLineNo">005</span><a id="line.5">import com.github.benmanes.caffeine.cache.LoadingCache;</a>
 <span class="sourceLineNo">006</span><a id="line.6">import com.github.benmanes.caffeine.cache.stats.CacheStats;</a>
@@ -81,7 +81,7 @@
 <span class="sourceLineNo">072</span><a id="line.72">     * @param cacheName The name of the cache, will be the metrics label value</a>
 <span class="sourceLineNo">073</span><a id="line.73">     * @param cache The cache being monitored</a>
 <span class="sourceLineNo">074</span><a id="line.74">     */</a>
-<span class="sourceLineNo">075</span><a id="line.75">    public void addCache(String cacheName, AsyncLoadingCache cache) {</a>
+<span class="sourceLineNo">075</span><a id="line.75">    public void addCache(String cacheName, AsyncCache cache) {</a>
 <span class="sourceLineNo">076</span><a id="line.76">        children.put(cacheName, cache.synchronous());</a>
 <span class="sourceLineNo">077</span><a id="line.77">    }</a>
 <span class="sourceLineNo">078</span><a id="line.78"></a>
