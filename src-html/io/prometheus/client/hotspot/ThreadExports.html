@@ -1,138 +1,137 @@
-<!DOCTYPE HTML>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html lang="en">
 <head>
 <title>Source code</title>
 <link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
 </head>
 <body>
-<main role="main">
 <div class="sourceContainer">
-<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.hotspot;</a>
-<span class="sourceLineNo">002</span><a id="line.2"></a>
-<span class="sourceLineNo">003</span><a id="line.3">import io.prometheus.client.Collector;</a>
-<span class="sourceLineNo">004</span><a id="line.4">import io.prometheus.client.CounterMetricFamily;</a>
-<span class="sourceLineNo">005</span><a id="line.5">import io.prometheus.client.GaugeMetricFamily;</a>
-<span class="sourceLineNo">006</span><a id="line.6"></a>
-<span class="sourceLineNo">007</span><a id="line.7">import java.lang.management.ManagementFactory;</a>
-<span class="sourceLineNo">008</span><a id="line.8">import java.lang.management.ThreadInfo;</a>
-<span class="sourceLineNo">009</span><a id="line.9">import java.lang.management.ThreadMXBean;</a>
-<span class="sourceLineNo">010</span><a id="line.10">import java.util.ArrayList;</a>
-<span class="sourceLineNo">011</span><a id="line.11">import java.util.Collections;</a>
-<span class="sourceLineNo">012</span><a id="line.12">import java.util.HashMap;</a>
-<span class="sourceLineNo">013</span><a id="line.13">import java.util.List;</a>
-<span class="sourceLineNo">014</span><a id="line.14">import java.util.Map;</a>
-<span class="sourceLineNo">015</span><a id="line.15"></a>
-<span class="sourceLineNo">016</span><a id="line.16">/**</a>
-<span class="sourceLineNo">017</span><a id="line.17"> * Exports metrics about JVM thread areas.</a>
-<span class="sourceLineNo">018</span><a id="line.18"> * &lt;p&gt;</a>
-<span class="sourceLineNo">019</span><a id="line.19"> * Example usage:</a>
-<span class="sourceLineNo">020</span><a id="line.20"> * &lt;pre&gt;</a>
-<span class="sourceLineNo">021</span><a id="line.21"> * {@code</a>
-<span class="sourceLineNo">022</span><a id="line.22"> *   new ThreadExports().register();</a>
-<span class="sourceLineNo">023</span><a id="line.23"> * }</a>
-<span class="sourceLineNo">024</span><a id="line.24"> * &lt;/pre&gt;</a>
-<span class="sourceLineNo">025</span><a id="line.25"> * Example metrics being exported:</a>
-<span class="sourceLineNo">026</span><a id="line.26"> * &lt;pre&gt;</a>
-<span class="sourceLineNo">027</span><a id="line.27"> *   jvm_threads_current{} 300</a>
-<span class="sourceLineNo">028</span><a id="line.28"> *   jvm_threads_daemon{} 200</a>
-<span class="sourceLineNo">029</span><a id="line.29"> *   jvm_threads_peak{} 410</a>
-<span class="sourceLineNo">030</span><a id="line.30"> *   jvm_threads_started_total{} 1200</a>
-<span class="sourceLineNo">031</span><a id="line.31"> * &lt;/pre&gt;</a>
-<span class="sourceLineNo">032</span><a id="line.32"> */</a>
-<span class="sourceLineNo">033</span><a id="line.33">public class ThreadExports extends Collector {</a>
-<span class="sourceLineNo">034</span><a id="line.34">  private final ThreadMXBean threadBean;</a>
-<span class="sourceLineNo">035</span><a id="line.35"></a>
-<span class="sourceLineNo">036</span><a id="line.36">  public ThreadExports() {</a>
-<span class="sourceLineNo">037</span><a id="line.37">    this(ManagementFactory.getThreadMXBean());</a>
-<span class="sourceLineNo">038</span><a id="line.38">  }</a>
-<span class="sourceLineNo">039</span><a id="line.39"></a>
-<span class="sourceLineNo">040</span><a id="line.40">  public ThreadExports(ThreadMXBean threadBean) {</a>
-<span class="sourceLineNo">041</span><a id="line.41">    this.threadBean = threadBean;</a>
-<span class="sourceLineNo">042</span><a id="line.42">  }</a>
-<span class="sourceLineNo">043</span><a id="line.43"></a>
-<span class="sourceLineNo">044</span><a id="line.44">  void addThreadMetrics(List&lt;MetricFamilySamples&gt; sampleFamilies) {</a>
-<span class="sourceLineNo">045</span><a id="line.45">    sampleFamilies.add(</a>
-<span class="sourceLineNo">046</span><a id="line.46">        new GaugeMetricFamily(</a>
-<span class="sourceLineNo">047</span><a id="line.47">          "jvm_threads_current",</a>
-<span class="sourceLineNo">048</span><a id="line.48">          "Current thread count of a JVM",</a>
-<span class="sourceLineNo">049</span><a id="line.49">          threadBean.getThreadCount()));</a>
-<span class="sourceLineNo">050</span><a id="line.50"></a>
-<span class="sourceLineNo">051</span><a id="line.51">    sampleFamilies.add(</a>
-<span class="sourceLineNo">052</span><a id="line.52">        new GaugeMetricFamily(</a>
-<span class="sourceLineNo">053</span><a id="line.53">          "jvm_threads_daemon",</a>
-<span class="sourceLineNo">054</span><a id="line.54">          "Daemon thread count of a JVM",</a>
-<span class="sourceLineNo">055</span><a id="line.55">          threadBean.getDaemonThreadCount()));</a>
-<span class="sourceLineNo">056</span><a id="line.56"></a>
-<span class="sourceLineNo">057</span><a id="line.57">    sampleFamilies.add(</a>
-<span class="sourceLineNo">058</span><a id="line.58">        new GaugeMetricFamily(</a>
-<span class="sourceLineNo">059</span><a id="line.59">          "jvm_threads_peak",</a>
-<span class="sourceLineNo">060</span><a id="line.60">          "Peak thread count of a JVM",</a>
-<span class="sourceLineNo">061</span><a id="line.61">          threadBean.getPeakThreadCount()));</a>
-<span class="sourceLineNo">062</span><a id="line.62"></a>
-<span class="sourceLineNo">063</span><a id="line.63">    sampleFamilies.add(</a>
-<span class="sourceLineNo">064</span><a id="line.64">        new CounterMetricFamily(</a>
-<span class="sourceLineNo">065</span><a id="line.65">          "jvm_threads_started_total",</a>
-<span class="sourceLineNo">066</span><a id="line.66">          "Started thread count of a JVM",</a>
-<span class="sourceLineNo">067</span><a id="line.67">          threadBean.getTotalStartedThreadCount()));</a>
-<span class="sourceLineNo">068</span><a id="line.68"></a>
-<span class="sourceLineNo">069</span><a id="line.69">    sampleFamilies.add(</a>
-<span class="sourceLineNo">070</span><a id="line.70">        new GaugeMetricFamily(</a>
-<span class="sourceLineNo">071</span><a id="line.71">        "jvm_threads_deadlocked",</a>
-<span class="sourceLineNo">072</span><a id="line.72">        "Cycles of JVM-threads that are in deadlock waiting to acquire object monitors or ownable synchronizers",</a>
-<span class="sourceLineNo">073</span><a id="line.73">        nullSafeArrayLength(threadBean.findDeadlockedThreads())));</a>
-<span class="sourceLineNo">074</span><a id="line.74"></a>
-<span class="sourceLineNo">075</span><a id="line.75">    sampleFamilies.add(</a>
-<span class="sourceLineNo">076</span><a id="line.76">        new GaugeMetricFamily(</a>
-<span class="sourceLineNo">077</span><a id="line.77">        "jvm_threads_deadlocked_monitor",</a>
-<span class="sourceLineNo">078</span><a id="line.78">        "Cycles of JVM-threads that are in deadlock waiting to acquire object monitors",</a>
-<span class="sourceLineNo">079</span><a id="line.79">        nullSafeArrayLength(threadBean.findMonitorDeadlockedThreads())));</a>
-<span class="sourceLineNo">080</span><a id="line.80"></a>
-<span class="sourceLineNo">081</span><a id="line.81">    GaugeMetricFamily threadStateFamily = new GaugeMetricFamily(</a>
-<span class="sourceLineNo">082</span><a id="line.82">      "jvm_threads_state",</a>
-<span class="sourceLineNo">083</span><a id="line.83">      "Current count of threads by state",</a>
-<span class="sourceLineNo">084</span><a id="line.84">      Collections.singletonList("state"));</a>
-<span class="sourceLineNo">085</span><a id="line.85"></a>
-<span class="sourceLineNo">086</span><a id="line.86">    Map&lt;Thread.State, Integer&gt; threadStateCounts = getThreadStateCountMap();</a>
-<span class="sourceLineNo">087</span><a id="line.87">    for (Map.Entry&lt;Thread.State, Integer&gt; entry : threadStateCounts.entrySet()) {</a>
-<span class="sourceLineNo">088</span><a id="line.88">      threadStateFamily.addMetric(</a>
-<span class="sourceLineNo">089</span><a id="line.89">        Collections.singletonList(entry.getKey().toString()),</a>
-<span class="sourceLineNo">090</span><a id="line.90">        entry.getValue()</a>
-<span class="sourceLineNo">091</span><a id="line.91">      );</a>
-<span class="sourceLineNo">092</span><a id="line.92">    }</a>
-<span class="sourceLineNo">093</span><a id="line.93">    sampleFamilies.add(threadStateFamily);</a>
-<span class="sourceLineNo">094</span><a id="line.94">  }</a>
-<span class="sourceLineNo">095</span><a id="line.95"></a>
-<span class="sourceLineNo">096</span><a id="line.96">  private Map&lt;Thread.State, Integer&gt; getThreadStateCountMap() {</a>
-<span class="sourceLineNo">097</span><a id="line.97">    // Get thread information without computing any stack traces</a>
-<span class="sourceLineNo">098</span><a id="line.98">    ThreadInfo[] allThreads = threadBean.getThreadInfo(threadBean.getAllThreadIds(), 0);</a>
-<span class="sourceLineNo">099</span><a id="line.99"></a>
-<span class="sourceLineNo">100</span><a id="line.100">    // Initialize the map with all thread states</a>
-<span class="sourceLineNo">101</span><a id="line.101">    HashMap&lt;Thread.State, Integer&gt; threadCounts = new HashMap&lt;Thread.State, Integer&gt;();</a>
-<span class="sourceLineNo">102</span><a id="line.102">    for (Thread.State state : Thread.State.values()) {</a>
-<span class="sourceLineNo">103</span><a id="line.103">      threadCounts.put(state, 0);</a>
-<span class="sourceLineNo">104</span><a id="line.104">    }</a>
-<span class="sourceLineNo">105</span><a id="line.105"></a>
-<span class="sourceLineNo">106</span><a id="line.106">    // Collect the actual thread counts</a>
-<span class="sourceLineNo">107</span><a id="line.107">    for (ThreadInfo curThread : allThreads) {</a>
-<span class="sourceLineNo">108</span><a id="line.108">      if (curThread != null) {</a>
-<span class="sourceLineNo">109</span><a id="line.109">        Thread.State threadState = curThread.getThreadState();</a>
-<span class="sourceLineNo">110</span><a id="line.110">        threadCounts.put(threadState, threadCounts.get(threadState) + 1);</a>
-<span class="sourceLineNo">111</span><a id="line.111">      }</a>
-<span class="sourceLineNo">112</span><a id="line.112">    }</a>
-<span class="sourceLineNo">113</span><a id="line.113"></a>
-<span class="sourceLineNo">114</span><a id="line.114">    return threadCounts;</a>
-<span class="sourceLineNo">115</span><a id="line.115">  }</a>
-<span class="sourceLineNo">116</span><a id="line.116"></a>
-<span class="sourceLineNo">117</span><a id="line.117">  private static double nullSafeArrayLength(long[] array) {</a>
-<span class="sourceLineNo">118</span><a id="line.118">    return null == array ? 0 : array.length;</a>
-<span class="sourceLineNo">119</span><a id="line.119">  }</a>
-<span class="sourceLineNo">120</span><a id="line.120"></a>
-<span class="sourceLineNo">121</span><a id="line.121">  public List&lt;MetricFamilySamples&gt; collect() {</a>
-<span class="sourceLineNo">122</span><a id="line.122">    List&lt;MetricFamilySamples&gt; mfs = new ArrayList&lt;MetricFamilySamples&gt;();</a>
-<span class="sourceLineNo">123</span><a id="line.123">    addThreadMetrics(mfs);</a>
-<span class="sourceLineNo">124</span><a id="line.124">    return mfs;</a>
-<span class="sourceLineNo">125</span><a id="line.125">  }</a>
-<span class="sourceLineNo">126</span><a id="line.126">}</a>
+<pre><span class="sourceLineNo">001</span>package io.prometheus.client.hotspot;<a name="line.1"></a>
+<span class="sourceLineNo">002</span><a name="line.2"></a>
+<span class="sourceLineNo">003</span>import io.prometheus.client.Collector;<a name="line.3"></a>
+<span class="sourceLineNo">004</span>import io.prometheus.client.CounterMetricFamily;<a name="line.4"></a>
+<span class="sourceLineNo">005</span>import io.prometheus.client.GaugeMetricFamily;<a name="line.5"></a>
+<span class="sourceLineNo">006</span><a name="line.6"></a>
+<span class="sourceLineNo">007</span>import java.lang.management.ManagementFactory;<a name="line.7"></a>
+<span class="sourceLineNo">008</span>import java.lang.management.ThreadInfo;<a name="line.8"></a>
+<span class="sourceLineNo">009</span>import java.lang.management.ThreadMXBean;<a name="line.9"></a>
+<span class="sourceLineNo">010</span>import java.util.ArrayList;<a name="line.10"></a>
+<span class="sourceLineNo">011</span>import java.util.Collections;<a name="line.11"></a>
+<span class="sourceLineNo">012</span>import java.util.HashMap;<a name="line.12"></a>
+<span class="sourceLineNo">013</span>import java.util.List;<a name="line.13"></a>
+<span class="sourceLineNo">014</span>import java.util.Map;<a name="line.14"></a>
+<span class="sourceLineNo">015</span><a name="line.15"></a>
+<span class="sourceLineNo">016</span>/**<a name="line.16"></a>
+<span class="sourceLineNo">017</span> * Exports metrics about JVM thread areas.<a name="line.17"></a>
+<span class="sourceLineNo">018</span> * &lt;p&gt;<a name="line.18"></a>
+<span class="sourceLineNo">019</span> * Example usage:<a name="line.19"></a>
+<span class="sourceLineNo">020</span> * &lt;pre&gt;<a name="line.20"></a>
+<span class="sourceLineNo">021</span> * {@code<a name="line.21"></a>
+<span class="sourceLineNo">022</span> *   new ThreadExports().register();<a name="line.22"></a>
+<span class="sourceLineNo">023</span> * }<a name="line.23"></a>
+<span class="sourceLineNo">024</span> * &lt;/pre&gt;<a name="line.24"></a>
+<span class="sourceLineNo">025</span> * Example metrics being exported:<a name="line.25"></a>
+<span class="sourceLineNo">026</span> * &lt;pre&gt;<a name="line.26"></a>
+<span class="sourceLineNo">027</span> *   jvm_threads_current{} 300<a name="line.27"></a>
+<span class="sourceLineNo">028</span> *   jvm_threads_daemon{} 200<a name="line.28"></a>
+<span class="sourceLineNo">029</span> *   jvm_threads_peak{} 410<a name="line.29"></a>
+<span class="sourceLineNo">030</span> *   jvm_threads_started_total{} 1200<a name="line.30"></a>
+<span class="sourceLineNo">031</span> * &lt;/pre&gt;<a name="line.31"></a>
+<span class="sourceLineNo">032</span> */<a name="line.32"></a>
+<span class="sourceLineNo">033</span>public class ThreadExports extends Collector {<a name="line.33"></a>
+<span class="sourceLineNo">034</span>  private final ThreadMXBean threadBean;<a name="line.34"></a>
+<span class="sourceLineNo">035</span><a name="line.35"></a>
+<span class="sourceLineNo">036</span>  public ThreadExports() {<a name="line.36"></a>
+<span class="sourceLineNo">037</span>    this(ManagementFactory.getThreadMXBean());<a name="line.37"></a>
+<span class="sourceLineNo">038</span>  }<a name="line.38"></a>
+<span class="sourceLineNo">039</span><a name="line.39"></a>
+<span class="sourceLineNo">040</span>  public ThreadExports(ThreadMXBean threadBean) {<a name="line.40"></a>
+<span class="sourceLineNo">041</span>    this.threadBean = threadBean;<a name="line.41"></a>
+<span class="sourceLineNo">042</span>  }<a name="line.42"></a>
+<span class="sourceLineNo">043</span><a name="line.43"></a>
+<span class="sourceLineNo">044</span>  void addThreadMetrics(List&lt;MetricFamilySamples&gt; sampleFamilies) {<a name="line.44"></a>
+<span class="sourceLineNo">045</span>    sampleFamilies.add(<a name="line.45"></a>
+<span class="sourceLineNo">046</span>        new GaugeMetricFamily(<a name="line.46"></a>
+<span class="sourceLineNo">047</span>          "jvm_threads_current",<a name="line.47"></a>
+<span class="sourceLineNo">048</span>          "Current thread count of a JVM",<a name="line.48"></a>
+<span class="sourceLineNo">049</span>          threadBean.getThreadCount()));<a name="line.49"></a>
+<span class="sourceLineNo">050</span><a name="line.50"></a>
+<span class="sourceLineNo">051</span>    sampleFamilies.add(<a name="line.51"></a>
+<span class="sourceLineNo">052</span>        new GaugeMetricFamily(<a name="line.52"></a>
+<span class="sourceLineNo">053</span>          "jvm_threads_daemon",<a name="line.53"></a>
+<span class="sourceLineNo">054</span>          "Daemon thread count of a JVM",<a name="line.54"></a>
+<span class="sourceLineNo">055</span>          threadBean.getDaemonThreadCount()));<a name="line.55"></a>
+<span class="sourceLineNo">056</span><a name="line.56"></a>
+<span class="sourceLineNo">057</span>    sampleFamilies.add(<a name="line.57"></a>
+<span class="sourceLineNo">058</span>        new GaugeMetricFamily(<a name="line.58"></a>
+<span class="sourceLineNo">059</span>          "jvm_threads_peak",<a name="line.59"></a>
+<span class="sourceLineNo">060</span>          "Peak thread count of a JVM",<a name="line.60"></a>
+<span class="sourceLineNo">061</span>          threadBean.getPeakThreadCount()));<a name="line.61"></a>
+<span class="sourceLineNo">062</span><a name="line.62"></a>
+<span class="sourceLineNo">063</span>    sampleFamilies.add(<a name="line.63"></a>
+<span class="sourceLineNo">064</span>        new CounterMetricFamily(<a name="line.64"></a>
+<span class="sourceLineNo">065</span>          "jvm_threads_started_total",<a name="line.65"></a>
+<span class="sourceLineNo">066</span>          "Started thread count of a JVM",<a name="line.66"></a>
+<span class="sourceLineNo">067</span>          threadBean.getTotalStartedThreadCount()));<a name="line.67"></a>
+<span class="sourceLineNo">068</span><a name="line.68"></a>
+<span class="sourceLineNo">069</span>    sampleFamilies.add(<a name="line.69"></a>
+<span class="sourceLineNo">070</span>        new GaugeMetricFamily(<a name="line.70"></a>
+<span class="sourceLineNo">071</span>        "jvm_threads_deadlocked",<a name="line.71"></a>
+<span class="sourceLineNo">072</span>        "Cycles of JVM-threads that are in deadlock waiting to acquire object monitors or ownable synchronizers",<a name="line.72"></a>
+<span class="sourceLineNo">073</span>        nullSafeArrayLength(threadBean.findDeadlockedThreads())));<a name="line.73"></a>
+<span class="sourceLineNo">074</span><a name="line.74"></a>
+<span class="sourceLineNo">075</span>    sampleFamilies.add(<a name="line.75"></a>
+<span class="sourceLineNo">076</span>        new GaugeMetricFamily(<a name="line.76"></a>
+<span class="sourceLineNo">077</span>        "jvm_threads_deadlocked_monitor",<a name="line.77"></a>
+<span class="sourceLineNo">078</span>        "Cycles of JVM-threads that are in deadlock waiting to acquire object monitors",<a name="line.78"></a>
+<span class="sourceLineNo">079</span>        nullSafeArrayLength(threadBean.findMonitorDeadlockedThreads())));<a name="line.79"></a>
+<span class="sourceLineNo">080</span><a name="line.80"></a>
+<span class="sourceLineNo">081</span>    GaugeMetricFamily threadStateFamily = new GaugeMetricFamily(<a name="line.81"></a>
+<span class="sourceLineNo">082</span>      "jvm_threads_state",<a name="line.82"></a>
+<span class="sourceLineNo">083</span>      "Current count of threads by state",<a name="line.83"></a>
+<span class="sourceLineNo">084</span>      Collections.singletonList("state"));<a name="line.84"></a>
+<span class="sourceLineNo">085</span><a name="line.85"></a>
+<span class="sourceLineNo">086</span>    Map&lt;Thread.State, Integer&gt; threadStateCounts = getThreadStateCountMap();<a name="line.86"></a>
+<span class="sourceLineNo">087</span>    for (Map.Entry&lt;Thread.State, Integer&gt; entry : threadStateCounts.entrySet()) {<a name="line.87"></a>
+<span class="sourceLineNo">088</span>      threadStateFamily.addMetric(<a name="line.88"></a>
+<span class="sourceLineNo">089</span>        Collections.singletonList(entry.getKey().toString()),<a name="line.89"></a>
+<span class="sourceLineNo">090</span>        entry.getValue()<a name="line.90"></a>
+<span class="sourceLineNo">091</span>      );<a name="line.91"></a>
+<span class="sourceLineNo">092</span>    }<a name="line.92"></a>
+<span class="sourceLineNo">093</span>    sampleFamilies.add(threadStateFamily);<a name="line.93"></a>
+<span class="sourceLineNo">094</span>  }<a name="line.94"></a>
+<span class="sourceLineNo">095</span><a name="line.95"></a>
+<span class="sourceLineNo">096</span>  private Map&lt;Thread.State, Integer&gt; getThreadStateCountMap() {<a name="line.96"></a>
+<span class="sourceLineNo">097</span>    // Get thread information without computing any stack traces<a name="line.97"></a>
+<span class="sourceLineNo">098</span>    ThreadInfo[] allThreads = threadBean.getThreadInfo(threadBean.getAllThreadIds(), 0);<a name="line.98"></a>
+<span class="sourceLineNo">099</span><a name="line.99"></a>
+<span class="sourceLineNo">100</span>    // Initialize the map with all thread states<a name="line.100"></a>
+<span class="sourceLineNo">101</span>    HashMap&lt;Thread.State, Integer&gt; threadCounts = new HashMap&lt;Thread.State, Integer&gt;();<a name="line.101"></a>
+<span class="sourceLineNo">102</span>    for (Thread.State state : Thread.State.values()) {<a name="line.102"></a>
+<span class="sourceLineNo">103</span>      threadCounts.put(state, 0);<a name="line.103"></a>
+<span class="sourceLineNo">104</span>    }<a name="line.104"></a>
+<span class="sourceLineNo">105</span><a name="line.105"></a>
+<span class="sourceLineNo">106</span>    // Collect the actual thread counts<a name="line.106"></a>
+<span class="sourceLineNo">107</span>    for (ThreadInfo curThread : allThreads) {<a name="line.107"></a>
+<span class="sourceLineNo">108</span>      if (curThread != null) {<a name="line.108"></a>
+<span class="sourceLineNo">109</span>        Thread.State threadState = curThread.getThreadState();<a name="line.109"></a>
+<span class="sourceLineNo">110</span>        threadCounts.put(threadState, threadCounts.get(threadState) + 1);<a name="line.110"></a>
+<span class="sourceLineNo">111</span>      }<a name="line.111"></a>
+<span class="sourceLineNo">112</span>    }<a name="line.112"></a>
+<span class="sourceLineNo">113</span><a name="line.113"></a>
+<span class="sourceLineNo">114</span>    return threadCounts;<a name="line.114"></a>
+<span class="sourceLineNo">115</span>  }<a name="line.115"></a>
+<span class="sourceLineNo">116</span><a name="line.116"></a>
+<span class="sourceLineNo">117</span>  private static double nullSafeArrayLength(long[] array) {<a name="line.117"></a>
+<span class="sourceLineNo">118</span>    return null == array ? 0 : array.length;<a name="line.118"></a>
+<span class="sourceLineNo">119</span>  }<a name="line.119"></a>
+<span class="sourceLineNo">120</span><a name="line.120"></a>
+<span class="sourceLineNo">121</span>  public List&lt;MetricFamilySamples&gt; collect() {<a name="line.121"></a>
+<span class="sourceLineNo">122</span>    List&lt;MetricFamilySamples&gt; mfs = new ArrayList&lt;MetricFamilySamples&gt;();<a name="line.122"></a>
+<span class="sourceLineNo">123</span>    addThreadMetrics(mfs);<a name="line.123"></a>
+<span class="sourceLineNo">124</span>    return mfs;<a name="line.124"></a>
+<span class="sourceLineNo">125</span>  }<a name="line.125"></a>
+<span class="sourceLineNo">126</span>}<a name="line.126"></a>
 
 
 
@@ -195,6 +194,5 @@
 
 </pre>
 </div>
-</main>
 </body>
 </html>

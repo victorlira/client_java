@@ -1,118 +1,117 @@
-<!DOCTYPE HTML>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html lang="en">
 <head>
 <title>Source code</title>
 <link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
 </head>
 <body>
-<main role="main">
 <div class="sourceContainer">
-<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.hotspot;</a>
-<span class="sourceLineNo">002</span><a id="line.2"></a>
-<span class="sourceLineNo">003</span><a id="line.3">import com.sun.management.GarbageCollectionNotificationInfo;</a>
-<span class="sourceLineNo">004</span><a id="line.4">import com.sun.management.GcInfo;</a>
-<span class="sourceLineNo">005</span><a id="line.5">import io.prometheus.client.Collector;</a>
-<span class="sourceLineNo">006</span><a id="line.6">import io.prometheus.client.Counter;</a>
-<span class="sourceLineNo">007</span><a id="line.7"></a>
-<span class="sourceLineNo">008</span><a id="line.8">import javax.management.Notification;</a>
-<span class="sourceLineNo">009</span><a id="line.9">import javax.management.NotificationEmitter;</a>
-<span class="sourceLineNo">010</span><a id="line.10">import javax.management.NotificationListener;</a>
-<span class="sourceLineNo">011</span><a id="line.11">import javax.management.openmbean.CompositeData;</a>
-<span class="sourceLineNo">012</span><a id="line.12">import java.lang.management.GarbageCollectorMXBean;</a>
-<span class="sourceLineNo">013</span><a id="line.13">import java.lang.management.ManagementFactory;</a>
-<span class="sourceLineNo">014</span><a id="line.14">import java.lang.management.MemoryUsage;</a>
-<span class="sourceLineNo">015</span><a id="line.15">import java.util.HashMap;</a>
-<span class="sourceLineNo">016</span><a id="line.16">import java.util.List;</a>
-<span class="sourceLineNo">017</span><a id="line.17">import java.util.Map;</a>
-<span class="sourceLineNo">018</span><a id="line.18"></a>
-<span class="sourceLineNo">019</span><a id="line.19">public class MemoryAllocationExports extends Collector {</a>
-<span class="sourceLineNo">020</span><a id="line.20">  private final Counter allocatedCounter = Counter.build()</a>
-<span class="sourceLineNo">021</span><a id="line.21">          .name("jvm_memory_pool_allocated_bytes_total")</a>
-<span class="sourceLineNo">022</span><a id="line.22">          .help("Total bytes allocated in a given JVM memory pool. Only updated after GC, not continuously.")</a>
-<span class="sourceLineNo">023</span><a id="line.23">          .labelNames("pool")</a>
-<span class="sourceLineNo">024</span><a id="line.24">          .create();</a>
-<span class="sourceLineNo">025</span><a id="line.25"></a>
-<span class="sourceLineNo">026</span><a id="line.26">  public MemoryAllocationExports() {</a>
-<span class="sourceLineNo">027</span><a id="line.27">    AllocationCountingNotificationListener listener = new AllocationCountingNotificationListener(allocatedCounter);</a>
-<span class="sourceLineNo">028</span><a id="line.28">    for (GarbageCollectorMXBean garbageCollectorMXBean : getGarbageCollectorMXBeans()) {</a>
-<span class="sourceLineNo">029</span><a id="line.29">      if (garbageCollectorMXBean instanceof NotificationEmitter) {</a>
-<span class="sourceLineNo">030</span><a id="line.30">        ((NotificationEmitter) garbageCollectorMXBean).addNotificationListener(listener, null, null);</a>
-<span class="sourceLineNo">031</span><a id="line.31">      }</a>
-<span class="sourceLineNo">032</span><a id="line.32">    }</a>
-<span class="sourceLineNo">033</span><a id="line.33">  }</a>
-<span class="sourceLineNo">034</span><a id="line.34"></a>
-<span class="sourceLineNo">035</span><a id="line.35">  @Override</a>
-<span class="sourceLineNo">036</span><a id="line.36">  public List&lt;MetricFamilySamples&gt; collect() {</a>
-<span class="sourceLineNo">037</span><a id="line.37">    return allocatedCounter.collect();</a>
-<span class="sourceLineNo">038</span><a id="line.38">  }</a>
-<span class="sourceLineNo">039</span><a id="line.39"></a>
-<span class="sourceLineNo">040</span><a id="line.40">  static class AllocationCountingNotificationListener implements NotificationListener {</a>
-<span class="sourceLineNo">041</span><a id="line.41">    private final Map&lt;String, Long&gt; lastMemoryUsage = new HashMap&lt;String, Long&gt;();</a>
-<span class="sourceLineNo">042</span><a id="line.42">    private final Counter counter;</a>
-<span class="sourceLineNo">043</span><a id="line.43"></a>
-<span class="sourceLineNo">044</span><a id="line.44">    AllocationCountingNotificationListener(Counter counter) {</a>
-<span class="sourceLineNo">045</span><a id="line.45">      this.counter = counter;</a>
-<span class="sourceLineNo">046</span><a id="line.46">    }</a>
-<span class="sourceLineNo">047</span><a id="line.47"></a>
-<span class="sourceLineNo">048</span><a id="line.48">    @Override</a>
-<span class="sourceLineNo">049</span><a id="line.49">    public synchronized void handleNotification(Notification notification, Object handback) {</a>
-<span class="sourceLineNo">050</span><a id="line.50">      GarbageCollectionNotificationInfo info = GarbageCollectionNotificationInfo.from((CompositeData) notification.getUserData());</a>
-<span class="sourceLineNo">051</span><a id="line.51">      GcInfo gcInfo = info.getGcInfo();</a>
-<span class="sourceLineNo">052</span><a id="line.52">      Map&lt;String, MemoryUsage&gt; memoryUsageBeforeGc = gcInfo.getMemoryUsageBeforeGc();</a>
-<span class="sourceLineNo">053</span><a id="line.53">      Map&lt;String, MemoryUsage&gt; memoryUsageAfterGc = gcInfo.getMemoryUsageAfterGc();</a>
-<span class="sourceLineNo">054</span><a id="line.54">      for (Map.Entry&lt;String, MemoryUsage&gt; entry : memoryUsageBeforeGc.entrySet()) {</a>
-<span class="sourceLineNo">055</span><a id="line.55">        String memoryPool = entry.getKey();</a>
-<span class="sourceLineNo">056</span><a id="line.56">        long before = entry.getValue().getUsed();</a>
-<span class="sourceLineNo">057</span><a id="line.57">        long after = memoryUsageAfterGc.get(memoryPool).getUsed();</a>
-<span class="sourceLineNo">058</span><a id="line.58">        handleMemoryPool(memoryPool, before, after);</a>
-<span class="sourceLineNo">059</span><a id="line.59">      }</a>
-<span class="sourceLineNo">060</span><a id="line.60">    }</a>
-<span class="sourceLineNo">061</span><a id="line.61"></a>
-<span class="sourceLineNo">062</span><a id="line.62">    // Visible for testing</a>
-<span class="sourceLineNo">063</span><a id="line.63">    void handleMemoryPool(String memoryPool, long before, long after) {</a>
-<span class="sourceLineNo">064</span><a id="line.64">      /*</a>
-<span class="sourceLineNo">065</span><a id="line.65">       * Calculate increase in the memory pool by comparing memory used</a>
-<span class="sourceLineNo">066</span><a id="line.66">       * after last GC, before this GC, and after this GC.</a>
-<span class="sourceLineNo">067</span><a id="line.67">       * See ascii illustration below.</a>
-<span class="sourceLineNo">068</span><a id="line.68">       * Make sure to count only increases and ignore decreases.</a>
-<span class="sourceLineNo">069</span><a id="line.69">       * (Typically a pool will only increase between GCs or during GCs, not both.</a>
-<span class="sourceLineNo">070</span><a id="line.70">       * E.g. eden pools between GCs. Survivor and old generation pools during GCs.)</a>
-<span class="sourceLineNo">071</span><a id="line.71">       *</a>
-<span class="sourceLineNo">072</span><a id="line.72">       *                         |&lt;-- diff1 --&gt;|&lt;-- diff2 --&gt;|</a>
-<span class="sourceLineNo">073</span><a id="line.73">       * Timeline: |-- last GC --|             |---- GC -----|</a>
-<span class="sourceLineNo">074</span><a id="line.74">       *                      ___^__        ___^____      ___^___</a>
-<span class="sourceLineNo">075</span><a id="line.75">       * Mem. usage vars:    / last \      / before \    / after \</a>
-<span class="sourceLineNo">076</span><a id="line.76">       */</a>
-<span class="sourceLineNo">077</span><a id="line.77"></a>
-<span class="sourceLineNo">078</span><a id="line.78">      // Get last memory usage after GC and remember memory used after for next time</a>
-<span class="sourceLineNo">079</span><a id="line.79">      long last = getAndSet(lastMemoryUsage, memoryPool, after);</a>
-<span class="sourceLineNo">080</span><a id="line.80">      // Difference since last GC</a>
-<span class="sourceLineNo">081</span><a id="line.81">      long diff1 = before - last;</a>
-<span class="sourceLineNo">082</span><a id="line.82">      // Difference during this GC</a>
-<span class="sourceLineNo">083</span><a id="line.83">      long diff2 = after - before;</a>
-<span class="sourceLineNo">084</span><a id="line.84">      // Make sure to only count increases</a>
-<span class="sourceLineNo">085</span><a id="line.85">      if (diff1 &lt; 0) {</a>
-<span class="sourceLineNo">086</span><a id="line.86">        diff1 = 0;</a>
-<span class="sourceLineNo">087</span><a id="line.87">      }</a>
-<span class="sourceLineNo">088</span><a id="line.88">      if (diff2 &lt; 0) {</a>
-<span class="sourceLineNo">089</span><a id="line.89">        diff2 = 0;</a>
-<span class="sourceLineNo">090</span><a id="line.90">      }</a>
-<span class="sourceLineNo">091</span><a id="line.91">      long increase = diff1 + diff2;</a>
-<span class="sourceLineNo">092</span><a id="line.92">      if (increase &gt; 0) {</a>
-<span class="sourceLineNo">093</span><a id="line.93">        counter.labels(memoryPool).inc(increase);</a>
-<span class="sourceLineNo">094</span><a id="line.94">      }</a>
-<span class="sourceLineNo">095</span><a id="line.95">    }</a>
-<span class="sourceLineNo">096</span><a id="line.96"></a>
-<span class="sourceLineNo">097</span><a id="line.97">    private static long getAndSet(Map&lt;String, Long&gt; map, String key, long value) {</a>
-<span class="sourceLineNo">098</span><a id="line.98">      Long last = map.put(key, value);</a>
-<span class="sourceLineNo">099</span><a id="line.99">      return last == null ? 0 : last;</a>
-<span class="sourceLineNo">100</span><a id="line.100">    }</a>
-<span class="sourceLineNo">101</span><a id="line.101">  }</a>
-<span class="sourceLineNo">102</span><a id="line.102"></a>
-<span class="sourceLineNo">103</span><a id="line.103">  protected List&lt;GarbageCollectorMXBean&gt; getGarbageCollectorMXBeans() {</a>
-<span class="sourceLineNo">104</span><a id="line.104">    return ManagementFactory.getGarbageCollectorMXBeans();</a>
-<span class="sourceLineNo">105</span><a id="line.105">  }</a>
-<span class="sourceLineNo">106</span><a id="line.106">}</a>
+<pre><span class="sourceLineNo">001</span>package io.prometheus.client.hotspot;<a name="line.1"></a>
+<span class="sourceLineNo">002</span><a name="line.2"></a>
+<span class="sourceLineNo">003</span>import com.sun.management.GarbageCollectionNotificationInfo;<a name="line.3"></a>
+<span class="sourceLineNo">004</span>import com.sun.management.GcInfo;<a name="line.4"></a>
+<span class="sourceLineNo">005</span>import io.prometheus.client.Collector;<a name="line.5"></a>
+<span class="sourceLineNo">006</span>import io.prometheus.client.Counter;<a name="line.6"></a>
+<span class="sourceLineNo">007</span><a name="line.7"></a>
+<span class="sourceLineNo">008</span>import javax.management.Notification;<a name="line.8"></a>
+<span class="sourceLineNo">009</span>import javax.management.NotificationEmitter;<a name="line.9"></a>
+<span class="sourceLineNo">010</span>import javax.management.NotificationListener;<a name="line.10"></a>
+<span class="sourceLineNo">011</span>import javax.management.openmbean.CompositeData;<a name="line.11"></a>
+<span class="sourceLineNo">012</span>import java.lang.management.GarbageCollectorMXBean;<a name="line.12"></a>
+<span class="sourceLineNo">013</span>import java.lang.management.ManagementFactory;<a name="line.13"></a>
+<span class="sourceLineNo">014</span>import java.lang.management.MemoryUsage;<a name="line.14"></a>
+<span class="sourceLineNo">015</span>import java.util.HashMap;<a name="line.15"></a>
+<span class="sourceLineNo">016</span>import java.util.List;<a name="line.16"></a>
+<span class="sourceLineNo">017</span>import java.util.Map;<a name="line.17"></a>
+<span class="sourceLineNo">018</span><a name="line.18"></a>
+<span class="sourceLineNo">019</span>public class MemoryAllocationExports extends Collector {<a name="line.19"></a>
+<span class="sourceLineNo">020</span>  private final Counter allocatedCounter = Counter.build()<a name="line.20"></a>
+<span class="sourceLineNo">021</span>          .name("jvm_memory_pool_allocated_bytes_total")<a name="line.21"></a>
+<span class="sourceLineNo">022</span>          .help("Total bytes allocated in a given JVM memory pool. Only updated after GC, not continuously.")<a name="line.22"></a>
+<span class="sourceLineNo">023</span>          .labelNames("pool")<a name="line.23"></a>
+<span class="sourceLineNo">024</span>          .create();<a name="line.24"></a>
+<span class="sourceLineNo">025</span><a name="line.25"></a>
+<span class="sourceLineNo">026</span>  public MemoryAllocationExports() {<a name="line.26"></a>
+<span class="sourceLineNo">027</span>    AllocationCountingNotificationListener listener = new AllocationCountingNotificationListener(allocatedCounter);<a name="line.27"></a>
+<span class="sourceLineNo">028</span>    for (GarbageCollectorMXBean garbageCollectorMXBean : getGarbageCollectorMXBeans()) {<a name="line.28"></a>
+<span class="sourceLineNo">029</span>      if (garbageCollectorMXBean instanceof NotificationEmitter) {<a name="line.29"></a>
+<span class="sourceLineNo">030</span>        ((NotificationEmitter) garbageCollectorMXBean).addNotificationListener(listener, null, null);<a name="line.30"></a>
+<span class="sourceLineNo">031</span>      }<a name="line.31"></a>
+<span class="sourceLineNo">032</span>    }<a name="line.32"></a>
+<span class="sourceLineNo">033</span>  }<a name="line.33"></a>
+<span class="sourceLineNo">034</span><a name="line.34"></a>
+<span class="sourceLineNo">035</span>  @Override<a name="line.35"></a>
+<span class="sourceLineNo">036</span>  public List&lt;MetricFamilySamples&gt; collect() {<a name="line.36"></a>
+<span class="sourceLineNo">037</span>    return allocatedCounter.collect();<a name="line.37"></a>
+<span class="sourceLineNo">038</span>  }<a name="line.38"></a>
+<span class="sourceLineNo">039</span><a name="line.39"></a>
+<span class="sourceLineNo">040</span>  static class AllocationCountingNotificationListener implements NotificationListener {<a name="line.40"></a>
+<span class="sourceLineNo">041</span>    private final Map&lt;String, Long&gt; lastMemoryUsage = new HashMap&lt;String, Long&gt;();<a name="line.41"></a>
+<span class="sourceLineNo">042</span>    private final Counter counter;<a name="line.42"></a>
+<span class="sourceLineNo">043</span><a name="line.43"></a>
+<span class="sourceLineNo">044</span>    AllocationCountingNotificationListener(Counter counter) {<a name="line.44"></a>
+<span class="sourceLineNo">045</span>      this.counter = counter;<a name="line.45"></a>
+<span class="sourceLineNo">046</span>    }<a name="line.46"></a>
+<span class="sourceLineNo">047</span><a name="line.47"></a>
+<span class="sourceLineNo">048</span>    @Override<a name="line.48"></a>
+<span class="sourceLineNo">049</span>    public synchronized void handleNotification(Notification notification, Object handback) {<a name="line.49"></a>
+<span class="sourceLineNo">050</span>      GarbageCollectionNotificationInfo info = GarbageCollectionNotificationInfo.from((CompositeData) notification.getUserData());<a name="line.50"></a>
+<span class="sourceLineNo">051</span>      GcInfo gcInfo = info.getGcInfo();<a name="line.51"></a>
+<span class="sourceLineNo">052</span>      Map&lt;String, MemoryUsage&gt; memoryUsageBeforeGc = gcInfo.getMemoryUsageBeforeGc();<a name="line.52"></a>
+<span class="sourceLineNo">053</span>      Map&lt;String, MemoryUsage&gt; memoryUsageAfterGc = gcInfo.getMemoryUsageAfterGc();<a name="line.53"></a>
+<span class="sourceLineNo">054</span>      for (Map.Entry&lt;String, MemoryUsage&gt; entry : memoryUsageBeforeGc.entrySet()) {<a name="line.54"></a>
+<span class="sourceLineNo">055</span>        String memoryPool = entry.getKey();<a name="line.55"></a>
+<span class="sourceLineNo">056</span>        long before = entry.getValue().getUsed();<a name="line.56"></a>
+<span class="sourceLineNo">057</span>        long after = memoryUsageAfterGc.get(memoryPool).getUsed();<a name="line.57"></a>
+<span class="sourceLineNo">058</span>        handleMemoryPool(memoryPool, before, after);<a name="line.58"></a>
+<span class="sourceLineNo">059</span>      }<a name="line.59"></a>
+<span class="sourceLineNo">060</span>    }<a name="line.60"></a>
+<span class="sourceLineNo">061</span><a name="line.61"></a>
+<span class="sourceLineNo">062</span>    // Visible for testing<a name="line.62"></a>
+<span class="sourceLineNo">063</span>    void handleMemoryPool(String memoryPool, long before, long after) {<a name="line.63"></a>
+<span class="sourceLineNo">064</span>      /*<a name="line.64"></a>
+<span class="sourceLineNo">065</span>       * Calculate increase in the memory pool by comparing memory used<a name="line.65"></a>
+<span class="sourceLineNo">066</span>       * after last GC, before this GC, and after this GC.<a name="line.66"></a>
+<span class="sourceLineNo">067</span>       * See ascii illustration below.<a name="line.67"></a>
+<span class="sourceLineNo">068</span>       * Make sure to count only increases and ignore decreases.<a name="line.68"></a>
+<span class="sourceLineNo">069</span>       * (Typically a pool will only increase between GCs or during GCs, not both.<a name="line.69"></a>
+<span class="sourceLineNo">070</span>       * E.g. eden pools between GCs. Survivor and old generation pools during GCs.)<a name="line.70"></a>
+<span class="sourceLineNo">071</span>       *<a name="line.71"></a>
+<span class="sourceLineNo">072</span>       *                         |&lt;-- diff1 --&gt;|&lt;-- diff2 --&gt;|<a name="line.72"></a>
+<span class="sourceLineNo">073</span>       * Timeline: |-- last GC --|             |---- GC -----|<a name="line.73"></a>
+<span class="sourceLineNo">074</span>       *                      ___^__        ___^____      ___^___<a name="line.74"></a>
+<span class="sourceLineNo">075</span>       * Mem. usage vars:    / last \      / before \    / after \<a name="line.75"></a>
+<span class="sourceLineNo">076</span>       */<a name="line.76"></a>
+<span class="sourceLineNo">077</span><a name="line.77"></a>
+<span class="sourceLineNo">078</span>      // Get last memory usage after GC and remember memory used after for next time<a name="line.78"></a>
+<span class="sourceLineNo">079</span>      long last = getAndSet(lastMemoryUsage, memoryPool, after);<a name="line.79"></a>
+<span class="sourceLineNo">080</span>      // Difference since last GC<a name="line.80"></a>
+<span class="sourceLineNo">081</span>      long diff1 = before - last;<a name="line.81"></a>
+<span class="sourceLineNo">082</span>      // Difference during this GC<a name="line.82"></a>
+<span class="sourceLineNo">083</span>      long diff2 = after - before;<a name="line.83"></a>
+<span class="sourceLineNo">084</span>      // Make sure to only count increases<a name="line.84"></a>
+<span class="sourceLineNo">085</span>      if (diff1 &lt; 0) {<a name="line.85"></a>
+<span class="sourceLineNo">086</span>        diff1 = 0;<a name="line.86"></a>
+<span class="sourceLineNo">087</span>      }<a name="line.87"></a>
+<span class="sourceLineNo">088</span>      if (diff2 &lt; 0) {<a name="line.88"></a>
+<span class="sourceLineNo">089</span>        diff2 = 0;<a name="line.89"></a>
+<span class="sourceLineNo">090</span>      }<a name="line.90"></a>
+<span class="sourceLineNo">091</span>      long increase = diff1 + diff2;<a name="line.91"></a>
+<span class="sourceLineNo">092</span>      if (increase &gt; 0) {<a name="line.92"></a>
+<span class="sourceLineNo">093</span>        counter.labels(memoryPool).inc(increase);<a name="line.93"></a>
+<span class="sourceLineNo">094</span>      }<a name="line.94"></a>
+<span class="sourceLineNo">095</span>    }<a name="line.95"></a>
+<span class="sourceLineNo">096</span><a name="line.96"></a>
+<span class="sourceLineNo">097</span>    private static long getAndSet(Map&lt;String, Long&gt; map, String key, long value) {<a name="line.97"></a>
+<span class="sourceLineNo">098</span>      Long last = map.put(key, value);<a name="line.98"></a>
+<span class="sourceLineNo">099</span>      return last == null ? 0 : last;<a name="line.99"></a>
+<span class="sourceLineNo">100</span>    }<a name="line.100"></a>
+<span class="sourceLineNo">101</span>  }<a name="line.101"></a>
+<span class="sourceLineNo">102</span><a name="line.102"></a>
+<span class="sourceLineNo">103</span>  protected List&lt;GarbageCollectorMXBean&gt; getGarbageCollectorMXBeans() {<a name="line.103"></a>
+<span class="sourceLineNo">104</span>    return ManagementFactory.getGarbageCollectorMXBeans();<a name="line.104"></a>
+<span class="sourceLineNo">105</span>  }<a name="line.105"></a>
+<span class="sourceLineNo">106</span>}<a name="line.106"></a>
 
 
 
@@ -175,6 +174,5 @@
 
 </pre>
 </div>
-</main>
 </body>
 </html>
