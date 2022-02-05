@@ -1,0 +1,492 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<main role="main">
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import io.prometheus.client.CKMSQuantiles.Quantile;</a>
+<span class="sourceLineNo">004</span><a id="line.4"></a>
+<span class="sourceLineNo">005</span><a id="line.5">import java.io.Closeable;</a>
+<span class="sourceLineNo">006</span><a id="line.6">import java.util.ArrayList;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import java.util.Collections;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import java.util.List;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import java.util.Map;</a>
+<span class="sourceLineNo">010</span><a id="line.10">import java.util.SortedMap;</a>
+<span class="sourceLineNo">011</span><a id="line.11">import java.util.TreeMap;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import java.util.concurrent.Callable;</a>
+<span class="sourceLineNo">013</span><a id="line.13">import java.util.concurrent.TimeUnit;</a>
+<span class="sourceLineNo">014</span><a id="line.14"></a>
+<span class="sourceLineNo">015</span><a id="line.15">/**</a>
+<span class="sourceLineNo">016</span><a id="line.16"> * {@link Summary} metrics and {@link Histogram} metrics can both be used to monitor distributions like latencies or request sizes.</a>
+<span class="sourceLineNo">017</span><a id="line.17"> * &lt;p&gt;</a>
+<span class="sourceLineNo">018</span><a id="line.18"> * An overview of when to use Summaries and when to use Histograms can be found on &lt;a href="https://prometheus.io/docs/practices/histograms"&gt;https://prometheus.io/docs/practices/histograms&lt;/a&gt;.</a>
+<span class="sourceLineNo">019</span><a id="line.19"> * &lt;p&gt;</a>
+<span class="sourceLineNo">020</span><a id="line.20"> * The following example shows how to measure latencies and request sizes:</a>
+<span class="sourceLineNo">021</span><a id="line.21"> *</a>
+<span class="sourceLineNo">022</span><a id="line.22"> * &lt;pre&gt;</a>
+<span class="sourceLineNo">023</span><a id="line.23"> * class YourClass {</a>
+<span class="sourceLineNo">024</span><a id="line.24"> *</a>
+<span class="sourceLineNo">025</span><a id="line.25"> *   private static final Summary requestLatency = Summary.build()</a>
+<span class="sourceLineNo">026</span><a id="line.26"> *       .name("requests_latency_seconds")</a>
+<span class="sourceLineNo">027</span><a id="line.27"> *       .help("request latency in seconds")</a>
+<span class="sourceLineNo">028</span><a id="line.28"> *       .register();</a>
+<span class="sourceLineNo">029</span><a id="line.29"> *</a>
+<span class="sourceLineNo">030</span><a id="line.30"> *   private static final Summary receivedBytes = Summary.build()</a>
+<span class="sourceLineNo">031</span><a id="line.31"> *       .name("requests_size_bytes")</a>
+<span class="sourceLineNo">032</span><a id="line.32"> *       .help("request size in bytes")</a>
+<span class="sourceLineNo">033</span><a id="line.33"> *       .register();</a>
+<span class="sourceLineNo">034</span><a id="line.34"> *</a>
+<span class="sourceLineNo">035</span><a id="line.35"> *   public void processRequest(Request req) {</a>
+<span class="sourceLineNo">036</span><a id="line.36"> *     Summary.Timer requestTimer = requestLatency.startTimer();</a>
+<span class="sourceLineNo">037</span><a id="line.37"> *     try {</a>
+<span class="sourceLineNo">038</span><a id="line.38"> *       // Your code here.</a>
+<span class="sourceLineNo">039</span><a id="line.39"> *     } finally {</a>
+<span class="sourceLineNo">040</span><a id="line.40"> *       requestTimer.observeDuration();</a>
+<span class="sourceLineNo">041</span><a id="line.41"> *       receivedBytes.observe(req.size());</a>
+<span class="sourceLineNo">042</span><a id="line.42"> *     }</a>
+<span class="sourceLineNo">043</span><a id="line.43"> *   }</a>
+<span class="sourceLineNo">044</span><a id="line.44"> * }</a>
+<span class="sourceLineNo">045</span><a id="line.45"> * &lt;/pre&gt;</a>
+<span class="sourceLineNo">046</span><a id="line.46"> *</a>
+<span class="sourceLineNo">047</span><a id="line.47"> * The {@link Summary} class provides different utility methods for observing values, like {@link #observe(double)},</a>
+<span class="sourceLineNo">048</span><a id="line.48"> * {@link #startTimer()} and {@link Timer#observeDuration()}, {@link #time(Callable)}, etc.</a>
+<span class="sourceLineNo">049</span><a id="line.49"> * &lt;p&gt;</a>
+<span class="sourceLineNo">050</span><a id="line.50"> * By default, {@link Summary} metrics provide the {@code count} and the {@code sum}. For example, if you measure</a>
+<span class="sourceLineNo">051</span><a id="line.51"> * latencies of a REST service, the {@code count} will tell you how often the REST service was called,</a>
+<span class="sourceLineNo">052</span><a id="line.52"> * and the {@code sum} will tell you the total aggregated response time.</a>
+<span class="sourceLineNo">053</span><a id="line.53"> * You can calculate the average response time using a Prometheus query dividing {@code sum / count}.</a>
+<span class="sourceLineNo">054</span><a id="line.54"> * &lt;p&gt;</a>
+<span class="sourceLineNo">055</span><a id="line.55"> * In addition to {@code count} and {@code sum}, you can configure a Summary to provide quantiles:</a>
+<span class="sourceLineNo">056</span><a id="line.56"> *</a>
+<span class="sourceLineNo">057</span><a id="line.57"> * &lt;pre&gt;</a>
+<span class="sourceLineNo">058</span><a id="line.58"> * Summary requestLatency = Summary.build()</a>
+<span class="sourceLineNo">059</span><a id="line.59"> *     .name("requests_latency_seconds")</a>
+<span class="sourceLineNo">060</span><a id="line.60"> *     .help("Request latency in seconds.")</a>
+<span class="sourceLineNo">061</span><a id="line.61"> *     .quantile(0.5, 0.01)    // 0.5 quantile (median) with 0.01 allowed error</a>
+<span class="sourceLineNo">062</span><a id="line.62"> *     .quantile(0.95, 0.005)  // 0.95 quantile with 0.005 allowed error</a>
+<span class="sourceLineNo">063</span><a id="line.63"> *     // ...</a>
+<span class="sourceLineNo">064</span><a id="line.64"> *     .register();</a>
+<span class="sourceLineNo">065</span><a id="line.65"> * &lt;/pre&gt;</a>
+<span class="sourceLineNo">066</span><a id="line.66"> *</a>
+<span class="sourceLineNo">067</span><a id="line.67"> * As an example, a 0.95 quantile of 120ms tells you that 95% of the calls were faster than 120ms, and 5% of the calls were slower than 120ms.</a>
+<span class="sourceLineNo">068</span><a id="line.68"> * &lt;p&gt;</a>
+<span class="sourceLineNo">069</span><a id="line.69"> * Tracking exact quantiles require a large amount of memory, because all observations need to be stored in a sorted list. Therefore, we allow an error to significantly reduce memory usage.</a>
+<span class="sourceLineNo">070</span><a id="line.70"> * &lt;p&gt;</a>
+<span class="sourceLineNo">071</span><a id="line.71"> * In the example, the allowed error of 0.005 means that you will not get the exact 0.95 quantile, but anything between the 0.945 quantile and the 0.955 quantile.</a>
+<span class="sourceLineNo">072</span><a id="line.72"> * &lt;p&gt;</a>
+<span class="sourceLineNo">073</span><a id="line.73"> * Experiments show that the {@link Summary} typically needs to keep less than 100 samples to provide that precision, even if you have hundreds of millions of observations.</a>
+<span class="sourceLineNo">074</span><a id="line.74"> * &lt;p&gt;</a>
+<span class="sourceLineNo">075</span><a id="line.75"> * There are a few special cases:</a>
+<span class="sourceLineNo">076</span><a id="line.76"> *</a>
+<span class="sourceLineNo">077</span><a id="line.77"> * &lt;ul&gt;</a>
+<span class="sourceLineNo">078</span><a id="line.78"> *   &lt;li&gt;You can set an allowed error of 0, but then the {@link Summary} will keep all observations in memory.&lt;/li&gt;</a>
+<span class="sourceLineNo">079</span><a id="line.79"> *   &lt;li&gt;You can track the minimum value with {@code .quantile(0.0, 0.0)}.</a>
+<span class="sourceLineNo">080</span><a id="line.80"> *       This special case will not use additional memory even though the allowed error is 0.&lt;/li&gt;</a>
+<span class="sourceLineNo">081</span><a id="line.81"> *   &lt;li&gt;You can track the maximum value with {@code .quantile(1.0, 0.0)}.</a>
+<span class="sourceLineNo">082</span><a id="line.82"> *       This special case will not use additional memory even though the allowed error is 0.&lt;/li&gt;</a>
+<span class="sourceLineNo">083</span><a id="line.83"> * &lt;/ul&gt;</a>
+<span class="sourceLineNo">084</span><a id="line.84"> *</a>
+<span class="sourceLineNo">085</span><a id="line.85"> * Typically, you don't want to have a {@link Summary} representing the entire runtime of the application,</a>
+<span class="sourceLineNo">086</span><a id="line.86"> * but you want to look at a reasonable time interval. {@link Summary} metrics implement a configurable sliding</a>
+<span class="sourceLineNo">087</span><a id="line.87"> * time window:</a>
+<span class="sourceLineNo">088</span><a id="line.88"> *</a>
+<span class="sourceLineNo">089</span><a id="line.89"> * &lt;pre&gt;</a>
+<span class="sourceLineNo">090</span><a id="line.90"> * Summary requestLatency = Summary.build()</a>
+<span class="sourceLineNo">091</span><a id="line.91"> *     .name("requests_latency_seconds")</a>
+<span class="sourceLineNo">092</span><a id="line.92"> *     .help("Request latency in seconds.")</a>
+<span class="sourceLineNo">093</span><a id="line.93"> *     .maxAgeSeconds(10 * 60)</a>
+<span class="sourceLineNo">094</span><a id="line.94"> *     .ageBuckets(5)</a>
+<span class="sourceLineNo">095</span><a id="line.95"> *     // ...</a>
+<span class="sourceLineNo">096</span><a id="line.96"> *     .register();</a>
+<span class="sourceLineNo">097</span><a id="line.97"> * &lt;/pre&gt;</a>
+<span class="sourceLineNo">098</span><a id="line.98"> *</a>
+<span class="sourceLineNo">099</span><a id="line.99"> * The default is a time window of 10 minutes and 5 age buckets, i.e. the time window is 10 minutes wide, and</a>
+<span class="sourceLineNo">100</span><a id="line.100"> * we slide it forward every 2 minutes.</a>
+<span class="sourceLineNo">101</span><a id="line.101"> */</a>
+<span class="sourceLineNo">102</span><a id="line.102">public class Summary extends SimpleCollector&lt;Summary.Child&gt; implements Counter.Describable {</a>
+<span class="sourceLineNo">103</span><a id="line.103"></a>
+<span class="sourceLineNo">104</span><a id="line.104">  final List&lt;Quantile&gt; quantiles; // Can be empty, but can never be null.</a>
+<span class="sourceLineNo">105</span><a id="line.105">  final long maxAgeSeconds;</a>
+<span class="sourceLineNo">106</span><a id="line.106">  final int ageBuckets;</a>
+<span class="sourceLineNo">107</span><a id="line.107"></a>
+<span class="sourceLineNo">108</span><a id="line.108">  Summary(Builder b) {</a>
+<span class="sourceLineNo">109</span><a id="line.109">    super(b);</a>
+<span class="sourceLineNo">110</span><a id="line.110">    quantiles = Collections.unmodifiableList(new ArrayList&lt;Quantile&gt;(b.quantiles));</a>
+<span class="sourceLineNo">111</span><a id="line.111">    this.maxAgeSeconds = b.maxAgeSeconds;</a>
+<span class="sourceLineNo">112</span><a id="line.112">    this.ageBuckets = b.ageBuckets;</a>
+<span class="sourceLineNo">113</span><a id="line.113">    initializeNoLabelsChild();</a>
+<span class="sourceLineNo">114</span><a id="line.114">  }</a>
+<span class="sourceLineNo">115</span><a id="line.115"></a>
+<span class="sourceLineNo">116</span><a id="line.116">  public static class Builder extends SimpleCollector.Builder&lt;Builder, Summary&gt; {</a>
+<span class="sourceLineNo">117</span><a id="line.117"></a>
+<span class="sourceLineNo">118</span><a id="line.118">    private final List&lt;Quantile&gt; quantiles = new ArrayList&lt;Quantile&gt;();</a>
+<span class="sourceLineNo">119</span><a id="line.119">    private long maxAgeSeconds = TimeUnit.MINUTES.toSeconds(10);</a>
+<span class="sourceLineNo">120</span><a id="line.120">    private int ageBuckets = 5;</a>
+<span class="sourceLineNo">121</span><a id="line.121"></a>
+<span class="sourceLineNo">122</span><a id="line.122">    /**</a>
+<span class="sourceLineNo">123</span><a id="line.123">     * The class JavaDoc for {@link Summary} has more information on {@link #quantile(double, double)}.</a>
+<span class="sourceLineNo">124</span><a id="line.124">     * @see Summary</a>
+<span class="sourceLineNo">125</span><a id="line.125">     */</a>
+<span class="sourceLineNo">126</span><a id="line.126">    public Builder quantile(double quantile, double error) {</a>
+<span class="sourceLineNo">127</span><a id="line.127">      if (quantile &lt; 0.0 || quantile &gt; 1.0) {</a>
+<span class="sourceLineNo">128</span><a id="line.128">        throw new IllegalArgumentException("Quantile " + quantile + " invalid: Expected number between 0.0 and 1.0.");</a>
+<span class="sourceLineNo">129</span><a id="line.129">      }</a>
+<span class="sourceLineNo">130</span><a id="line.130">      if (error &lt; 0.0 || error &gt; 1.0) {</a>
+<span class="sourceLineNo">131</span><a id="line.131">        throw new IllegalArgumentException("Error " + error + " invalid: Expected number between 0.0 and 1.0.");</a>
+<span class="sourceLineNo">132</span><a id="line.132">      }</a>
+<span class="sourceLineNo">133</span><a id="line.133">      quantiles.add(new Quantile(quantile, error));</a>
+<span class="sourceLineNo">134</span><a id="line.134">      return this;</a>
+<span class="sourceLineNo">135</span><a id="line.135">    }</a>
+<span class="sourceLineNo">136</span><a id="line.136"></a>
+<span class="sourceLineNo">137</span><a id="line.137">    /**</a>
+<span class="sourceLineNo">138</span><a id="line.138">     * The class JavaDoc for {@link Summary} has more information on {@link #maxAgeSeconds(long)} </a>
+<span class="sourceLineNo">139</span><a id="line.139">     * @see Summary</a>
+<span class="sourceLineNo">140</span><a id="line.140">     */</a>
+<span class="sourceLineNo">141</span><a id="line.141">    public Builder maxAgeSeconds(long maxAgeSeconds) {</a>
+<span class="sourceLineNo">142</span><a id="line.142">      if (maxAgeSeconds &lt;= 0) {</a>
+<span class="sourceLineNo">143</span><a id="line.143">        throw new IllegalArgumentException("maxAgeSeconds cannot be " + maxAgeSeconds);</a>
+<span class="sourceLineNo">144</span><a id="line.144">      }</a>
+<span class="sourceLineNo">145</span><a id="line.145">      this.maxAgeSeconds = maxAgeSeconds;</a>
+<span class="sourceLineNo">146</span><a id="line.146">      return this;</a>
+<span class="sourceLineNo">147</span><a id="line.147">    }</a>
+<span class="sourceLineNo">148</span><a id="line.148"></a>
+<span class="sourceLineNo">149</span><a id="line.149">    /**</a>
+<span class="sourceLineNo">150</span><a id="line.150">     * The class JavaDoc for {@link Summary} has more information on {@link #ageBuckets(int)} </a>
+<span class="sourceLineNo">151</span><a id="line.151">     * @see Summary</a>
+<span class="sourceLineNo">152</span><a id="line.152">     */</a>
+<span class="sourceLineNo">153</span><a id="line.153">    public Builder ageBuckets(int ageBuckets) {</a>
+<span class="sourceLineNo">154</span><a id="line.154">      if (ageBuckets &lt;= 0) {</a>
+<span class="sourceLineNo">155</span><a id="line.155">        throw new IllegalArgumentException("ageBuckets cannot be " + ageBuckets);</a>
+<span class="sourceLineNo">156</span><a id="line.156">      }</a>
+<span class="sourceLineNo">157</span><a id="line.157">      this.ageBuckets = ageBuckets;</a>
+<span class="sourceLineNo">158</span><a id="line.158">      return this;</a>
+<span class="sourceLineNo">159</span><a id="line.159">    }</a>
+<span class="sourceLineNo">160</span><a id="line.160"></a>
+<span class="sourceLineNo">161</span><a id="line.161">    @Override</a>
+<span class="sourceLineNo">162</span><a id="line.162">    public Summary create() {</a>
+<span class="sourceLineNo">163</span><a id="line.163">      for (String label : labelNames) {</a>
+<span class="sourceLineNo">164</span><a id="line.164">        if (label.equals("quantile")) {</a>
+<span class="sourceLineNo">165</span><a id="line.165">          throw new IllegalStateException("Summary cannot have a label named 'quantile'.");</a>
+<span class="sourceLineNo">166</span><a id="line.166">        }</a>
+<span class="sourceLineNo">167</span><a id="line.167">      }</a>
+<span class="sourceLineNo">168</span><a id="line.168">      dontInitializeNoLabelsChild = true;</a>
+<span class="sourceLineNo">169</span><a id="line.169">      return new Summary(this);</a>
+<span class="sourceLineNo">170</span><a id="line.170">    }</a>
+<span class="sourceLineNo">171</span><a id="line.171">  }</a>
+<span class="sourceLineNo">172</span><a id="line.172"></a>
+<span class="sourceLineNo">173</span><a id="line.173">  /**</a>
+<span class="sourceLineNo">174</span><a id="line.174">   *  Return a Builder to allow configuration of a new Summary. Ensures required fields are provided.</a>
+<span class="sourceLineNo">175</span><a id="line.175">   *</a>
+<span class="sourceLineNo">176</span><a id="line.176">   *  @param name The name of the metric</a>
+<span class="sourceLineNo">177</span><a id="line.177">   *  @param help The help string of the metric</a>
+<span class="sourceLineNo">178</span><a id="line.178">   */</a>
+<span class="sourceLineNo">179</span><a id="line.179">  public static Builder build(String name, String help) {</a>
+<span class="sourceLineNo">180</span><a id="line.180">    return new Builder().name(name).help(help);</a>
+<span class="sourceLineNo">181</span><a id="line.181">  }</a>
+<span class="sourceLineNo">182</span><a id="line.182"></a>
+<span class="sourceLineNo">183</span><a id="line.183">  /**</a>
+<span class="sourceLineNo">184</span><a id="line.184">   *  Return a Builder to allow configuration of a new Summary.</a>
+<span class="sourceLineNo">185</span><a id="line.185">   */</a>
+<span class="sourceLineNo">186</span><a id="line.186">  public static Builder build() {</a>
+<span class="sourceLineNo">187</span><a id="line.187">    return new Builder();</a>
+<span class="sourceLineNo">188</span><a id="line.188">  }</a>
+<span class="sourceLineNo">189</span><a id="line.189"></a>
+<span class="sourceLineNo">190</span><a id="line.190">  @Override</a>
+<span class="sourceLineNo">191</span><a id="line.191">  protected Child newChild() {</a>
+<span class="sourceLineNo">192</span><a id="line.192">    return new Child(quantiles, maxAgeSeconds, ageBuckets);</a>
+<span class="sourceLineNo">193</span><a id="line.193">  }</a>
+<span class="sourceLineNo">194</span><a id="line.194"></a>
+<span class="sourceLineNo">195</span><a id="line.195"></a>
+<span class="sourceLineNo">196</span><a id="line.196">  /**</a>
+<span class="sourceLineNo">197</span><a id="line.197">   * Represents an event being timed.</a>
+<span class="sourceLineNo">198</span><a id="line.198">   */</a>
+<span class="sourceLineNo">199</span><a id="line.199">  public static class Timer implements Closeable {</a>
+<span class="sourceLineNo">200</span><a id="line.200">    private final Child child;</a>
+<span class="sourceLineNo">201</span><a id="line.201">    private final long start;</a>
+<span class="sourceLineNo">202</span><a id="line.202">    private Timer(Child child, long start) {</a>
+<span class="sourceLineNo">203</span><a id="line.203">      this.child = child;</a>
+<span class="sourceLineNo">204</span><a id="line.204">      this.start = start;</a>
+<span class="sourceLineNo">205</span><a id="line.205">    }</a>
+<span class="sourceLineNo">206</span><a id="line.206">    /**</a>
+<span class="sourceLineNo">207</span><a id="line.207">     * Observe the amount of time in seconds since {@link Child#startTimer} was called.</a>
+<span class="sourceLineNo">208</span><a id="line.208">     * @return Measured duration in seconds since {@link Child#startTimer} was called.</a>
+<span class="sourceLineNo">209</span><a id="line.209">     */</a>
+<span class="sourceLineNo">210</span><a id="line.210">    public double observeDuration() {</a>
+<span class="sourceLineNo">211</span><a id="line.211">      double elapsed = SimpleTimer.elapsedSecondsFromNanos(start, SimpleTimer.defaultTimeProvider.nanoTime());</a>
+<span class="sourceLineNo">212</span><a id="line.212">      child.observe(elapsed);</a>
+<span class="sourceLineNo">213</span><a id="line.213">      return elapsed;</a>
+<span class="sourceLineNo">214</span><a id="line.214">    }</a>
+<span class="sourceLineNo">215</span><a id="line.215"></a>
+<span class="sourceLineNo">216</span><a id="line.216">    /**</a>
+<span class="sourceLineNo">217</span><a id="line.217">     * Equivalent to calling {@link #observeDuration()}.</a>
+<span class="sourceLineNo">218</span><a id="line.218">     */</a>
+<span class="sourceLineNo">219</span><a id="line.219">    @Override</a>
+<span class="sourceLineNo">220</span><a id="line.220">    public void close() {</a>
+<span class="sourceLineNo">221</span><a id="line.221">      observeDuration();</a>
+<span class="sourceLineNo">222</span><a id="line.222">    }</a>
+<span class="sourceLineNo">223</span><a id="line.223">  }</a>
+<span class="sourceLineNo">224</span><a id="line.224"></a>
+<span class="sourceLineNo">225</span><a id="line.225">  /**</a>
+<span class="sourceLineNo">226</span><a id="line.226">   * The value of a single Summary.</a>
+<span class="sourceLineNo">227</span><a id="line.227">   * &lt;p&gt;</a>
+<span class="sourceLineNo">228</span><a id="line.228">   * &lt;em&gt;Warning:&lt;/em&gt; References to a Child become invalid after using</a>
+<span class="sourceLineNo">229</span><a id="line.229">   * {@link SimpleCollector#remove} or {@link SimpleCollector#clear}.</a>
+<span class="sourceLineNo">230</span><a id="line.230">   */</a>
+<span class="sourceLineNo">231</span><a id="line.231">  public static class Child {</a>
+<span class="sourceLineNo">232</span><a id="line.232"></a>
+<span class="sourceLineNo">233</span><a id="line.233">    /**</a>
+<span class="sourceLineNo">234</span><a id="line.234">     * Executes runnable code (e.g. a Java 8 Lambda) and observes a duration of how long it took to run.</a>
+<span class="sourceLineNo">235</span><a id="line.235">     *</a>
+<span class="sourceLineNo">236</span><a id="line.236">     * @param timeable Code that is being timed</a>
+<span class="sourceLineNo">237</span><a id="line.237">     * @return Measured duration in seconds for timeable to complete.</a>
+<span class="sourceLineNo">238</span><a id="line.238">     */</a>
+<span class="sourceLineNo">239</span><a id="line.239">    public double time(Runnable timeable) {</a>
+<span class="sourceLineNo">240</span><a id="line.240">      Timer timer = startTimer();</a>
+<span class="sourceLineNo">241</span><a id="line.241"></a>
+<span class="sourceLineNo">242</span><a id="line.242">      double elapsed;</a>
+<span class="sourceLineNo">243</span><a id="line.243">      try {</a>
+<span class="sourceLineNo">244</span><a id="line.244">        timeable.run();</a>
+<span class="sourceLineNo">245</span><a id="line.245">      } finally {</a>
+<span class="sourceLineNo">246</span><a id="line.246">        elapsed = timer.observeDuration();</a>
+<span class="sourceLineNo">247</span><a id="line.247">      }</a>
+<span class="sourceLineNo">248</span><a id="line.248">      return elapsed;</a>
+<span class="sourceLineNo">249</span><a id="line.249">    }</a>
+<span class="sourceLineNo">250</span><a id="line.250"></a>
+<span class="sourceLineNo">251</span><a id="line.251">    /**</a>
+<span class="sourceLineNo">252</span><a id="line.252">     * Executes callable code (e.g. a Java 8 Lambda) and observes a duration of how long it took to run.</a>
+<span class="sourceLineNo">253</span><a id="line.253">     *</a>
+<span class="sourceLineNo">254</span><a id="line.254">     * @param timeable Code that is being timed</a>
+<span class="sourceLineNo">255</span><a id="line.255">     * @return Result returned by callable.</a>
+<span class="sourceLineNo">256</span><a id="line.256">     */</a>
+<span class="sourceLineNo">257</span><a id="line.257">    public &lt;E&gt; E time(Callable&lt;E&gt; timeable) {</a>
+<span class="sourceLineNo">258</span><a id="line.258">      Timer timer = startTimer();</a>
+<span class="sourceLineNo">259</span><a id="line.259"></a>
+<span class="sourceLineNo">260</span><a id="line.260">      try {</a>
+<span class="sourceLineNo">261</span><a id="line.261">        return timeable.call();</a>
+<span class="sourceLineNo">262</span><a id="line.262">      } catch (RuntimeException e) {</a>
+<span class="sourceLineNo">263</span><a id="line.263">        throw e;</a>
+<span class="sourceLineNo">264</span><a id="line.264">      } catch (Exception e) {</a>
+<span class="sourceLineNo">265</span><a id="line.265">        throw new RuntimeException(e);</a>
+<span class="sourceLineNo">266</span><a id="line.266">      } finally {</a>
+<span class="sourceLineNo">267</span><a id="line.267">        timer.observeDuration();</a>
+<span class="sourceLineNo">268</span><a id="line.268">      }</a>
+<span class="sourceLineNo">269</span><a id="line.269">    }</a>
+<span class="sourceLineNo">270</span><a id="line.270"></a>
+<span class="sourceLineNo">271</span><a id="line.271">    public static class Value {</a>
+<span class="sourceLineNo">272</span><a id="line.272">      public final double count;</a>
+<span class="sourceLineNo">273</span><a id="line.273">      public final double sum;</a>
+<span class="sourceLineNo">274</span><a id="line.274">      public final SortedMap&lt;Double, Double&gt; quantiles;</a>
+<span class="sourceLineNo">275</span><a id="line.275">      public final long created;</a>
+<span class="sourceLineNo">276</span><a id="line.276"></a>
+<span class="sourceLineNo">277</span><a id="line.277">      private Value(double count, double sum, List&lt;Quantile&gt; quantiles, TimeWindowQuantiles quantileValues, long created) {</a>
+<span class="sourceLineNo">278</span><a id="line.278">        this.count = count;</a>
+<span class="sourceLineNo">279</span><a id="line.279">        this.sum = sum;</a>
+<span class="sourceLineNo">280</span><a id="line.280">        this.quantiles = Collections.unmodifiableSortedMap(snapshot(quantiles, quantileValues));</a>
+<span class="sourceLineNo">281</span><a id="line.281">        this.created = created;</a>
+<span class="sourceLineNo">282</span><a id="line.282">      }</a>
+<span class="sourceLineNo">283</span><a id="line.283"></a>
+<span class="sourceLineNo">284</span><a id="line.284">      private SortedMap&lt;Double, Double&gt; snapshot(List&lt;Quantile&gt; quantiles, TimeWindowQuantiles quantileValues) {</a>
+<span class="sourceLineNo">285</span><a id="line.285">        SortedMap&lt;Double, Double&gt; result = new TreeMap&lt;Double, Double&gt;();</a>
+<span class="sourceLineNo">286</span><a id="line.286">        for (Quantile q : quantiles) {</a>
+<span class="sourceLineNo">287</span><a id="line.287">          result.put(q.quantile, quantileValues.get(q.quantile));</a>
+<span class="sourceLineNo">288</span><a id="line.288">        }</a>
+<span class="sourceLineNo">289</span><a id="line.289">        return result;</a>
+<span class="sourceLineNo">290</span><a id="line.290">      }</a>
+<span class="sourceLineNo">291</span><a id="line.291">    }</a>
+<span class="sourceLineNo">292</span><a id="line.292"></a>
+<span class="sourceLineNo">293</span><a id="line.293">    // Having these separate leaves us open to races,</a>
+<span class="sourceLineNo">294</span><a id="line.294">    // however Prometheus as whole has other races</a>
+<span class="sourceLineNo">295</span><a id="line.295">    // that mean adding atomicity here wouldn't be useful.</a>
+<span class="sourceLineNo">296</span><a id="line.296">    // This should be reevaluated in the future.</a>
+<span class="sourceLineNo">297</span><a id="line.297">    private final DoubleAdder count = new DoubleAdder();</a>
+<span class="sourceLineNo">298</span><a id="line.298">    private final DoubleAdder sum = new DoubleAdder();</a>
+<span class="sourceLineNo">299</span><a id="line.299">    private final List&lt;Quantile&gt; quantiles;</a>
+<span class="sourceLineNo">300</span><a id="line.300">    private final TimeWindowQuantiles quantileValues;</a>
+<span class="sourceLineNo">301</span><a id="line.301">    private final long created = System.currentTimeMillis();</a>
+<span class="sourceLineNo">302</span><a id="line.302"></a>
+<span class="sourceLineNo">303</span><a id="line.303">    private Child(List&lt;Quantile&gt; quantiles, long maxAgeSeconds, int ageBuckets) {</a>
+<span class="sourceLineNo">304</span><a id="line.304">      this.quantiles = quantiles;</a>
+<span class="sourceLineNo">305</span><a id="line.305">      if (quantiles.size() &gt; 0) {</a>
+<span class="sourceLineNo">306</span><a id="line.306">        quantileValues = new TimeWindowQuantiles(quantiles.toArray(new Quantile[]{}), maxAgeSeconds, ageBuckets);</a>
+<span class="sourceLineNo">307</span><a id="line.307">      } else {</a>
+<span class="sourceLineNo">308</span><a id="line.308">        quantileValues = null;</a>
+<span class="sourceLineNo">309</span><a id="line.309">      }</a>
+<span class="sourceLineNo">310</span><a id="line.310">    }</a>
+<span class="sourceLineNo">311</span><a id="line.311"></a>
+<span class="sourceLineNo">312</span><a id="line.312">    /**</a>
+<span class="sourceLineNo">313</span><a id="line.313">     * Observe the given amount.</a>
+<span class="sourceLineNo">314</span><a id="line.314">     * @param amt in most cases amt should be &amp;gt;= 0. Negative values are supported, but you should read</a>
+<span class="sourceLineNo">315</span><a id="line.315">     *            &lt;a href="https://prometheus.io/docs/practices/histograms/#count-and-sum-of-observations"&gt;</a>
+<span class="sourceLineNo">316</span><a id="line.316">     *            https://prometheus.io/docs/practices/histograms/#count-and-sum-of-observations&lt;/a&gt; for</a>
+<span class="sourceLineNo">317</span><a id="line.317">     *            implications and alternatives.</a>
+<span class="sourceLineNo">318</span><a id="line.318">     */</a>
+<span class="sourceLineNo">319</span><a id="line.319">    public void observe(double amt) {</a>
+<span class="sourceLineNo">320</span><a id="line.320">      count.add(1);</a>
+<span class="sourceLineNo">321</span><a id="line.321">      sum.add(amt);</a>
+<span class="sourceLineNo">322</span><a id="line.322">      if (quantileValues != null) {</a>
+<span class="sourceLineNo">323</span><a id="line.323">        quantileValues.insert(amt);</a>
+<span class="sourceLineNo">324</span><a id="line.324">      }</a>
+<span class="sourceLineNo">325</span><a id="line.325">    }</a>
+<span class="sourceLineNo">326</span><a id="line.326">    /**</a>
+<span class="sourceLineNo">327</span><a id="line.327">     * Start a timer to track a duration.</a>
+<span class="sourceLineNo">328</span><a id="line.328">     * &lt;p&gt;</a>
+<span class="sourceLineNo">329</span><a id="line.329">     * Call {@link Timer#observeDuration} at the end of what you want to measure the duration of.</a>
+<span class="sourceLineNo">330</span><a id="line.330">     */</a>
+<span class="sourceLineNo">331</span><a id="line.331">    public Timer startTimer() {</a>
+<span class="sourceLineNo">332</span><a id="line.332">      return new Timer(this, SimpleTimer.defaultTimeProvider.nanoTime());</a>
+<span class="sourceLineNo">333</span><a id="line.333">    }</a>
+<span class="sourceLineNo">334</span><a id="line.334">    /**</a>
+<span class="sourceLineNo">335</span><a id="line.335">     * Get the value of the Summary.</a>
+<span class="sourceLineNo">336</span><a id="line.336">     * &lt;p&gt;</a>
+<span class="sourceLineNo">337</span><a id="line.337">     * &lt;em&gt;Warning:&lt;/em&gt; The definition of {@link Value} is subject to change.</a>
+<span class="sourceLineNo">338</span><a id="line.338">     */</a>
+<span class="sourceLineNo">339</span><a id="line.339">    public Value get() {</a>
+<span class="sourceLineNo">340</span><a id="line.340">      return new Value(count.sum(), sum.sum(), quantiles, quantileValues, created);</a>
+<span class="sourceLineNo">341</span><a id="line.341">    }</a>
+<span class="sourceLineNo">342</span><a id="line.342">  }</a>
+<span class="sourceLineNo">343</span><a id="line.343"></a>
+<span class="sourceLineNo">344</span><a id="line.344">  // Convenience methods.</a>
+<span class="sourceLineNo">345</span><a id="line.345">  /**</a>
+<span class="sourceLineNo">346</span><a id="line.346">   * Observe the given amount on the summary with no labels.</a>
+<span class="sourceLineNo">347</span><a id="line.347">   * @param amt in most cases amt should be &amp;gt;= 0. Negative values are supported, but you should read</a>
+<span class="sourceLineNo">348</span><a id="line.348">   *            &lt;a href="https://prometheus.io/docs/practices/histograms/#count-and-sum-of-observations"&gt;</a>
+<span class="sourceLineNo">349</span><a id="line.349">   *            https://prometheus.io/docs/practices/histograms/#count-and-sum-of-observations&lt;/a&gt; for</a>
+<span class="sourceLineNo">350</span><a id="line.350">   *            implications and alternatives.</a>
+<span class="sourceLineNo">351</span><a id="line.351">   */</a>
+<span class="sourceLineNo">352</span><a id="line.352">  public void observe(double amt) {</a>
+<span class="sourceLineNo">353</span><a id="line.353">    noLabelsChild.observe(amt);</a>
+<span class="sourceLineNo">354</span><a id="line.354">  }</a>
+<span class="sourceLineNo">355</span><a id="line.355">  /**</a>
+<span class="sourceLineNo">356</span><a id="line.356">   * Start a timer to track a duration on the summary with no labels.</a>
+<span class="sourceLineNo">357</span><a id="line.357">   * &lt;p&gt;</a>
+<span class="sourceLineNo">358</span><a id="line.358">   * Call {@link Timer#observeDuration} at the end of what you want to measure the duration of.</a>
+<span class="sourceLineNo">359</span><a id="line.359">   */</a>
+<span class="sourceLineNo">360</span><a id="line.360">  public Timer startTimer() {</a>
+<span class="sourceLineNo">361</span><a id="line.361">    return noLabelsChild.startTimer();</a>
+<span class="sourceLineNo">362</span><a id="line.362">  }</a>
+<span class="sourceLineNo">363</span><a id="line.363"></a>
+<span class="sourceLineNo">364</span><a id="line.364">  /**</a>
+<span class="sourceLineNo">365</span><a id="line.365">   * Executes runnable code (e.g. a Java 8 Lambda) and observes a duration of how long it took to run.</a>
+<span class="sourceLineNo">366</span><a id="line.366">   *</a>
+<span class="sourceLineNo">367</span><a id="line.367">   * @param timeable Code that is being timed</a>
+<span class="sourceLineNo">368</span><a id="line.368">   * @return Measured duration in seconds for timeable to complete.</a>
+<span class="sourceLineNo">369</span><a id="line.369">   */</a>
+<span class="sourceLineNo">370</span><a id="line.370">  public double time(Runnable timeable){</a>
+<span class="sourceLineNo">371</span><a id="line.371">    return noLabelsChild.time(timeable);</a>
+<span class="sourceLineNo">372</span><a id="line.372">  }</a>
+<span class="sourceLineNo">373</span><a id="line.373"></a>
+<span class="sourceLineNo">374</span><a id="line.374">  /**</a>
+<span class="sourceLineNo">375</span><a id="line.375">   * Executes callable code (e.g. a Java 8 Lambda) and observes a duration of how long it took to run.</a>
+<span class="sourceLineNo">376</span><a id="line.376">   *</a>
+<span class="sourceLineNo">377</span><a id="line.377">   * @param timeable Code that is being timed</a>
+<span class="sourceLineNo">378</span><a id="line.378">   * @return Result returned by callable.</a>
+<span class="sourceLineNo">379</span><a id="line.379">   */</a>
+<span class="sourceLineNo">380</span><a id="line.380">  public &lt;E&gt; E time(Callable&lt;E&gt; timeable){</a>
+<span class="sourceLineNo">381</span><a id="line.381">    return noLabelsChild.time(timeable);</a>
+<span class="sourceLineNo">382</span><a id="line.382">  }</a>
+<span class="sourceLineNo">383</span><a id="line.383"></a>
+<span class="sourceLineNo">384</span><a id="line.384">  /**</a>
+<span class="sourceLineNo">385</span><a id="line.385">   * Get the value of the Summary.</a>
+<span class="sourceLineNo">386</span><a id="line.386">   * &lt;p&gt;</a>
+<span class="sourceLineNo">387</span><a id="line.387">   * &lt;em&gt;Warning:&lt;/em&gt; The definition of {@link Child.Value} is subject to change.</a>
+<span class="sourceLineNo">388</span><a id="line.388">   */</a>
+<span class="sourceLineNo">389</span><a id="line.389">  public Child.Value get() {</a>
+<span class="sourceLineNo">390</span><a id="line.390">    return noLabelsChild.get();</a>
+<span class="sourceLineNo">391</span><a id="line.391">  }</a>
+<span class="sourceLineNo">392</span><a id="line.392"></a>
+<span class="sourceLineNo">393</span><a id="line.393">  @Override</a>
+<span class="sourceLineNo">394</span><a id="line.394">  public List&lt;MetricFamilySamples&gt; collect() {</a>
+<span class="sourceLineNo">395</span><a id="line.395">    List&lt;MetricFamilySamples.Sample&gt; samples = new ArrayList&lt;MetricFamilySamples.Sample&gt;();</a>
+<span class="sourceLineNo">396</span><a id="line.396">    for(Map.Entry&lt;List&lt;String&gt;, Child&gt; c: children.entrySet()) {</a>
+<span class="sourceLineNo">397</span><a id="line.397">      Child.Value v = c.getValue().get();</a>
+<span class="sourceLineNo">398</span><a id="line.398">      List&lt;String&gt; labelNamesWithQuantile = new ArrayList&lt;String&gt;(labelNames);</a>
+<span class="sourceLineNo">399</span><a id="line.399">      labelNamesWithQuantile.add("quantile");</a>
+<span class="sourceLineNo">400</span><a id="line.400">      for(Map.Entry&lt;Double, Double&gt; q : v.quantiles.entrySet()) {</a>
+<span class="sourceLineNo">401</span><a id="line.401">        List&lt;String&gt; labelValuesWithQuantile = new ArrayList&lt;String&gt;(c.getKey());</a>
+<span class="sourceLineNo">402</span><a id="line.402">        labelValuesWithQuantile.add(doubleToGoString(q.getKey()));</a>
+<span class="sourceLineNo">403</span><a id="line.403">        samples.add(new MetricFamilySamples.Sample(fullname, labelNamesWithQuantile, labelValuesWithQuantile, q.getValue()));</a>
+<span class="sourceLineNo">404</span><a id="line.404">      }</a>
+<span class="sourceLineNo">405</span><a id="line.405">      samples.add(new MetricFamilySamples.Sample(fullname + "_count", labelNames, c.getKey(), v.count));</a>
+<span class="sourceLineNo">406</span><a id="line.406">      samples.add(new MetricFamilySamples.Sample(fullname + "_sum", labelNames, c.getKey(), v.sum));</a>
+<span class="sourceLineNo">407</span><a id="line.407">      samples.add(new MetricFamilySamples.Sample(fullname + "_created", labelNames, c.getKey(), v.created / 1000.0));</a>
+<span class="sourceLineNo">408</span><a id="line.408">    }</a>
+<span class="sourceLineNo">409</span><a id="line.409"></a>
+<span class="sourceLineNo">410</span><a id="line.410">    return familySamplesList(Type.SUMMARY, samples);</a>
+<span class="sourceLineNo">411</span><a id="line.411">  }</a>
+<span class="sourceLineNo">412</span><a id="line.412"></a>
+<span class="sourceLineNo">413</span><a id="line.413">  @Override</a>
+<span class="sourceLineNo">414</span><a id="line.414">  public List&lt;MetricFamilySamples&gt; describe() {</a>
+<span class="sourceLineNo">415</span><a id="line.415">    return Collections.&lt;MetricFamilySamples&gt;singletonList(new SummaryMetricFamily(fullname, help, labelNames));</a>
+<span class="sourceLineNo">416</span><a id="line.416">  }</a>
+<span class="sourceLineNo">417</span><a id="line.417"></a>
+<span class="sourceLineNo">418</span><a id="line.418">}</a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</main>
+</body>
+</html>

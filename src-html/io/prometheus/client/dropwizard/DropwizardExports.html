@@ -1,0 +1,275 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<main role="main">
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.dropwizard;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import com.codahale.metrics.Counter;</a>
+<span class="sourceLineNo">004</span><a id="line.4">import com.codahale.metrics.Gauge;</a>
+<span class="sourceLineNo">005</span><a id="line.5">import com.codahale.metrics.Histogram;</a>
+<span class="sourceLineNo">006</span><a id="line.6">import com.codahale.metrics.Meter;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import com.codahale.metrics.Metric;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import com.codahale.metrics.MetricFilter;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import com.codahale.metrics.MetricRegistry;</a>
+<span class="sourceLineNo">010</span><a id="line.10">import com.codahale.metrics.Snapshot;</a>
+<span class="sourceLineNo">011</span><a id="line.11">import com.codahale.metrics.Timer;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import io.prometheus.client.dropwizard.samplebuilder.SampleBuilder;</a>
+<span class="sourceLineNo">013</span><a id="line.13">import io.prometheus.client.dropwizard.samplebuilder.DefaultSampleBuilder;</a>
+<span class="sourceLineNo">014</span><a id="line.14"></a>
+<span class="sourceLineNo">015</span><a id="line.15">import java.util.ArrayList;</a>
+<span class="sourceLineNo">016</span><a id="line.16">import java.util.Arrays;</a>
+<span class="sourceLineNo">017</span><a id="line.17">import java.util.HashMap;</a>
+<span class="sourceLineNo">018</span><a id="line.18">import java.util.List;</a>
+<span class="sourceLineNo">019</span><a id="line.19">import java.util.Map;</a>
+<span class="sourceLineNo">020</span><a id="line.20">import java.util.SortedMap;</a>
+<span class="sourceLineNo">021</span><a id="line.21">import java.util.concurrent.TimeUnit;</a>
+<span class="sourceLineNo">022</span><a id="line.22">import java.util.logging.Level;</a>
+<span class="sourceLineNo">023</span><a id="line.23">import java.util.logging.Logger;</a>
+<span class="sourceLineNo">024</span><a id="line.24"></a>
+<span class="sourceLineNo">025</span><a id="line.25">/**</a>
+<span class="sourceLineNo">026</span><a id="line.26"> * Collect Dropwizard metrics from a MetricRegistry.</a>
+<span class="sourceLineNo">027</span><a id="line.27"> */</a>
+<span class="sourceLineNo">028</span><a id="line.28">public class DropwizardExports extends io.prometheus.client.Collector implements io.prometheus.client.Collector.Describable {</a>
+<span class="sourceLineNo">029</span><a id="line.29">    private static final Logger LOGGER = Logger.getLogger(DropwizardExports.class.getName());</a>
+<span class="sourceLineNo">030</span><a id="line.30">    private MetricRegistry registry;</a>
+<span class="sourceLineNo">031</span><a id="line.31">    private MetricFilter metricFilter;</a>
+<span class="sourceLineNo">032</span><a id="line.32">    private SampleBuilder sampleBuilder;</a>
+<span class="sourceLineNo">033</span><a id="line.33"></a>
+<span class="sourceLineNo">034</span><a id="line.34">    /**</a>
+<span class="sourceLineNo">035</span><a id="line.35">     * Creates a new DropwizardExports with a {@link DefaultSampleBuilder} and {@link MetricFilter#ALL}.</a>
+<span class="sourceLineNo">036</span><a id="line.36">     *</a>
+<span class="sourceLineNo">037</span><a id="line.37">     * @param registry a metric registry to export in prometheus.</a>
+<span class="sourceLineNo">038</span><a id="line.38">     */</a>
+<span class="sourceLineNo">039</span><a id="line.39">    public DropwizardExports(MetricRegistry registry) {</a>
+<span class="sourceLineNo">040</span><a id="line.40">        this.registry = registry;</a>
+<span class="sourceLineNo">041</span><a id="line.41">        this.metricFilter = MetricFilter.ALL;</a>
+<span class="sourceLineNo">042</span><a id="line.42">        this.sampleBuilder = new DefaultSampleBuilder();</a>
+<span class="sourceLineNo">043</span><a id="line.43">    }</a>
+<span class="sourceLineNo">044</span><a id="line.44"></a>
+<span class="sourceLineNo">045</span><a id="line.45">    /**</a>
+<span class="sourceLineNo">046</span><a id="line.46">     * Creates a new DropwizardExports with a {@link DefaultSampleBuilder} and custom {@link MetricFilter}.</a>
+<span class="sourceLineNo">047</span><a id="line.47">     *</a>
+<span class="sourceLineNo">048</span><a id="line.48">     * @param registry     a metric registry to export in prometheus.</a>
+<span class="sourceLineNo">049</span><a id="line.49">     * @param metricFilter a custom metric filter.</a>
+<span class="sourceLineNo">050</span><a id="line.50">     */</a>
+<span class="sourceLineNo">051</span><a id="line.51">    public DropwizardExports(MetricRegistry registry, MetricFilter metricFilter) {</a>
+<span class="sourceLineNo">052</span><a id="line.52">        this.registry = registry;</a>
+<span class="sourceLineNo">053</span><a id="line.53">        this.metricFilter = metricFilter;</a>
+<span class="sourceLineNo">054</span><a id="line.54">        this.sampleBuilder = new DefaultSampleBuilder();</a>
+<span class="sourceLineNo">055</span><a id="line.55">    }</a>
+<span class="sourceLineNo">056</span><a id="line.56"></a>
+<span class="sourceLineNo">057</span><a id="line.57">    /**</a>
+<span class="sourceLineNo">058</span><a id="line.58">     * @param registry      a metric registry to export in prometheus.</a>
+<span class="sourceLineNo">059</span><a id="line.59">     * @param sampleBuilder sampleBuilder to use to create prometheus samples.</a>
+<span class="sourceLineNo">060</span><a id="line.60">     */</a>
+<span class="sourceLineNo">061</span><a id="line.61">    public DropwizardExports(MetricRegistry registry, SampleBuilder sampleBuilder) {</a>
+<span class="sourceLineNo">062</span><a id="line.62">        this.registry = registry;</a>
+<span class="sourceLineNo">063</span><a id="line.63">        this.metricFilter = MetricFilter.ALL;</a>
+<span class="sourceLineNo">064</span><a id="line.64">        this.sampleBuilder = sampleBuilder;</a>
+<span class="sourceLineNo">065</span><a id="line.65">    }</a>
+<span class="sourceLineNo">066</span><a id="line.66"></a>
+<span class="sourceLineNo">067</span><a id="line.67">    /**</a>
+<span class="sourceLineNo">068</span><a id="line.68">     * @param registry      a metric registry to export in prometheus.</a>
+<span class="sourceLineNo">069</span><a id="line.69">     * @param metricFilter  a custom metric filter.</a>
+<span class="sourceLineNo">070</span><a id="line.70">     * @param sampleBuilder sampleBuilder to use to create prometheus samples.</a>
+<span class="sourceLineNo">071</span><a id="line.71">     */</a>
+<span class="sourceLineNo">072</span><a id="line.72">    public DropwizardExports(MetricRegistry registry, MetricFilter metricFilter, SampleBuilder sampleBuilder) {</a>
+<span class="sourceLineNo">073</span><a id="line.73">        this.registry = registry;</a>
+<span class="sourceLineNo">074</span><a id="line.74">        this.metricFilter = metricFilter;</a>
+<span class="sourceLineNo">075</span><a id="line.75">        this.sampleBuilder = sampleBuilder;</a>
+<span class="sourceLineNo">076</span><a id="line.76">    }</a>
+<span class="sourceLineNo">077</span><a id="line.77"></a>
+<span class="sourceLineNo">078</span><a id="line.78">    private static String getHelpMessage(String metricName, Metric metric) {</a>
+<span class="sourceLineNo">079</span><a id="line.79">        return String.format("Generated from Dropwizard metric import (metric=%s, type=%s)",</a>
+<span class="sourceLineNo">080</span><a id="line.80">                metricName, metric.getClass().getName());</a>
+<span class="sourceLineNo">081</span><a id="line.81">    }</a>
+<span class="sourceLineNo">082</span><a id="line.82"></a>
+<span class="sourceLineNo">083</span><a id="line.83">    /**</a>
+<span class="sourceLineNo">084</span><a id="line.84">     * Export counter as Prometheus &lt;a href="https://prometheus.io/docs/concepts/metric_types/#gauge"&gt;Gauge&lt;/a&gt;.</a>
+<span class="sourceLineNo">085</span><a id="line.85">     */</a>
+<span class="sourceLineNo">086</span><a id="line.86">    MetricFamilySamples fromCounter(String dropwizardName, Counter counter) {</a>
+<span class="sourceLineNo">087</span><a id="line.87">        MetricFamilySamples.Sample sample = sampleBuilder.createSample(dropwizardName, "", new ArrayList&lt;String&gt;(), new ArrayList&lt;String&gt;(),</a>
+<span class="sourceLineNo">088</span><a id="line.88">                new Long(counter.getCount()).doubleValue());</a>
+<span class="sourceLineNo">089</span><a id="line.89">        return new MetricFamilySamples(sample.name, Type.GAUGE, getHelpMessage(dropwizardName, counter), Arrays.asList(sample));</a>
+<span class="sourceLineNo">090</span><a id="line.90">    }</a>
+<span class="sourceLineNo">091</span><a id="line.91"></a>
+<span class="sourceLineNo">092</span><a id="line.92">    /**</a>
+<span class="sourceLineNo">093</span><a id="line.93">     * Export gauge as a prometheus gauge.</a>
+<span class="sourceLineNo">094</span><a id="line.94">     */</a>
+<span class="sourceLineNo">095</span><a id="line.95">    MetricFamilySamples fromGauge(String dropwizardName, Gauge gauge) {</a>
+<span class="sourceLineNo">096</span><a id="line.96">        Object obj = gauge.getValue();</a>
+<span class="sourceLineNo">097</span><a id="line.97">        double value;</a>
+<span class="sourceLineNo">098</span><a id="line.98">        if (obj instanceof Number) {</a>
+<span class="sourceLineNo">099</span><a id="line.99">            value = ((Number) obj).doubleValue();</a>
+<span class="sourceLineNo">100</span><a id="line.100">        } else if (obj instanceof Boolean) {</a>
+<span class="sourceLineNo">101</span><a id="line.101">            value = ((Boolean) obj) ? 1 : 0;</a>
+<span class="sourceLineNo">102</span><a id="line.102">        } else {</a>
+<span class="sourceLineNo">103</span><a id="line.103">            LOGGER.log(Level.FINE, String.format("Invalid type for Gauge %s: %s", sanitizeMetricName(dropwizardName),</a>
+<span class="sourceLineNo">104</span><a id="line.104">                    obj == null ? "null" : obj.getClass().getName()));</a>
+<span class="sourceLineNo">105</span><a id="line.105">            return null;</a>
+<span class="sourceLineNo">106</span><a id="line.106">        }</a>
+<span class="sourceLineNo">107</span><a id="line.107">        MetricFamilySamples.Sample sample = sampleBuilder.createSample(dropwizardName, "",</a>
+<span class="sourceLineNo">108</span><a id="line.108">                new ArrayList&lt;String&gt;(), new ArrayList&lt;String&gt;(), value);</a>
+<span class="sourceLineNo">109</span><a id="line.109">        return new MetricFamilySamples(sample.name, Type.GAUGE, getHelpMessage(dropwizardName, gauge), Arrays.asList(sample));</a>
+<span class="sourceLineNo">110</span><a id="line.110">    }</a>
+<span class="sourceLineNo">111</span><a id="line.111"></a>
+<span class="sourceLineNo">112</span><a id="line.112">    /**</a>
+<span class="sourceLineNo">113</span><a id="line.113">     * Export a histogram snapshot as a prometheus SUMMARY.</a>
+<span class="sourceLineNo">114</span><a id="line.114">     *</a>
+<span class="sourceLineNo">115</span><a id="line.115">     * @param dropwizardName metric name.</a>
+<span class="sourceLineNo">116</span><a id="line.116">     * @param snapshot       the histogram snapshot.</a>
+<span class="sourceLineNo">117</span><a id="line.117">     * @param count          the total sample count for this snapshot.</a>
+<span class="sourceLineNo">118</span><a id="line.118">     * @param factor         a factor to apply to histogram values.</a>
+<span class="sourceLineNo">119</span><a id="line.119">     */</a>
+<span class="sourceLineNo">120</span><a id="line.120">    MetricFamilySamples fromSnapshotAndCount(String dropwizardName, Snapshot snapshot, long count, double factor, String helpMessage) {</a>
+<span class="sourceLineNo">121</span><a id="line.121">        List&lt;MetricFamilySamples.Sample&gt; samples = Arrays.asList(</a>
+<span class="sourceLineNo">122</span><a id="line.122">                sampleBuilder.createSample(dropwizardName, "", Arrays.asList("quantile"), Arrays.asList("0.5"), snapshot.getMedian() * factor),</a>
+<span class="sourceLineNo">123</span><a id="line.123">                sampleBuilder.createSample(dropwizardName, "", Arrays.asList("quantile"), Arrays.asList("0.75"), snapshot.get75thPercentile() * factor),</a>
+<span class="sourceLineNo">124</span><a id="line.124">                sampleBuilder.createSample(dropwizardName, "", Arrays.asList("quantile"), Arrays.asList("0.95"), snapshot.get95thPercentile() * factor),</a>
+<span class="sourceLineNo">125</span><a id="line.125">                sampleBuilder.createSample(dropwizardName, "", Arrays.asList("quantile"), Arrays.asList("0.98"), snapshot.get98thPercentile() * factor),</a>
+<span class="sourceLineNo">126</span><a id="line.126">                sampleBuilder.createSample(dropwizardName, "", Arrays.asList("quantile"), Arrays.asList("0.99"), snapshot.get99thPercentile() * factor),</a>
+<span class="sourceLineNo">127</span><a id="line.127">                sampleBuilder.createSample(dropwizardName, "", Arrays.asList("quantile"), Arrays.asList("0.999"), snapshot.get999thPercentile() * factor),</a>
+<span class="sourceLineNo">128</span><a id="line.128">                sampleBuilder.createSample(dropwizardName, "_count", new ArrayList&lt;String&gt;(), new ArrayList&lt;String&gt;(), count)</a>
+<span class="sourceLineNo">129</span><a id="line.129">        );</a>
+<span class="sourceLineNo">130</span><a id="line.130">        return new MetricFamilySamples(samples.get(0).name, Type.SUMMARY, helpMessage, samples);</a>
+<span class="sourceLineNo">131</span><a id="line.131">    }</a>
+<span class="sourceLineNo">132</span><a id="line.132"></a>
+<span class="sourceLineNo">133</span><a id="line.133">    /**</a>
+<span class="sourceLineNo">134</span><a id="line.134">     * Convert histogram snapshot.</a>
+<span class="sourceLineNo">135</span><a id="line.135">     */</a>
+<span class="sourceLineNo">136</span><a id="line.136">    MetricFamilySamples fromHistogram(String dropwizardName, Histogram histogram) {</a>
+<span class="sourceLineNo">137</span><a id="line.137">        return fromSnapshotAndCount(dropwizardName, histogram.getSnapshot(), histogram.getCount(), 1.0,</a>
+<span class="sourceLineNo">138</span><a id="line.138">                getHelpMessage(dropwizardName, histogram));</a>
+<span class="sourceLineNo">139</span><a id="line.139">    }</a>
+<span class="sourceLineNo">140</span><a id="line.140"></a>
+<span class="sourceLineNo">141</span><a id="line.141">    /**</a>
+<span class="sourceLineNo">142</span><a id="line.142">     * Export Dropwizard Timer as a histogram. Use TIME_UNIT as time unit.</a>
+<span class="sourceLineNo">143</span><a id="line.143">     */</a>
+<span class="sourceLineNo">144</span><a id="line.144">    MetricFamilySamples fromTimer(String dropwizardName, Timer timer) {</a>
+<span class="sourceLineNo">145</span><a id="line.145">        return fromSnapshotAndCount(dropwizardName, timer.getSnapshot(), timer.getCount(),</a>
+<span class="sourceLineNo">146</span><a id="line.146">                1.0D / TimeUnit.SECONDS.toNanos(1L), getHelpMessage(dropwizardName, timer));</a>
+<span class="sourceLineNo">147</span><a id="line.147">    }</a>
+<span class="sourceLineNo">148</span><a id="line.148"></a>
+<span class="sourceLineNo">149</span><a id="line.149">    /**</a>
+<span class="sourceLineNo">150</span><a id="line.150">     * Export a Meter as as prometheus COUNTER.</a>
+<span class="sourceLineNo">151</span><a id="line.151">     */</a>
+<span class="sourceLineNo">152</span><a id="line.152">    MetricFamilySamples fromMeter(String dropwizardName, Meter meter) {</a>
+<span class="sourceLineNo">153</span><a id="line.153">        final MetricFamilySamples.Sample sample = sampleBuilder.createSample(dropwizardName, "_total",</a>
+<span class="sourceLineNo">154</span><a id="line.154">                new ArrayList&lt;String&gt;(),</a>
+<span class="sourceLineNo">155</span><a id="line.155">                new ArrayList&lt;String&gt;(),</a>
+<span class="sourceLineNo">156</span><a id="line.156">                meter.getCount());</a>
+<span class="sourceLineNo">157</span><a id="line.157">        return new MetricFamilySamples(sample.name, Type.COUNTER, getHelpMessage(dropwizardName, meter),</a>
+<span class="sourceLineNo">158</span><a id="line.158">                        Arrays.asList(sample));</a>
+<span class="sourceLineNo">159</span><a id="line.159">    }</a>
+<span class="sourceLineNo">160</span><a id="line.160"></a>
+<span class="sourceLineNo">161</span><a id="line.161">    @Override</a>
+<span class="sourceLineNo">162</span><a id="line.162">    public List&lt;MetricFamilySamples&gt; collect() {</a>
+<span class="sourceLineNo">163</span><a id="line.163">        Map&lt;String, MetricFamilySamples&gt; mfSamplesMap = new HashMap&lt;String, MetricFamilySamples&gt;();</a>
+<span class="sourceLineNo">164</span><a id="line.164"></a>
+<span class="sourceLineNo">165</span><a id="line.165">        for (SortedMap.Entry&lt;String, Gauge&gt; entry : registry.getGauges(metricFilter).entrySet()) {</a>
+<span class="sourceLineNo">166</span><a id="line.166">            addToMap(mfSamplesMap, fromGauge(entry.getKey(), entry.getValue()));</a>
+<span class="sourceLineNo">167</span><a id="line.167">        }</a>
+<span class="sourceLineNo">168</span><a id="line.168">        for (SortedMap.Entry&lt;String, Counter&gt; entry : registry.getCounters(metricFilter).entrySet()) {</a>
+<span class="sourceLineNo">169</span><a id="line.169">            addToMap(mfSamplesMap, fromCounter(entry.getKey(), entry.getValue()));</a>
+<span class="sourceLineNo">170</span><a id="line.170">        }</a>
+<span class="sourceLineNo">171</span><a id="line.171">        for (SortedMap.Entry&lt;String, Histogram&gt; entry : registry.getHistograms(metricFilter).entrySet()) {</a>
+<span class="sourceLineNo">172</span><a id="line.172">            addToMap(mfSamplesMap, fromHistogram(entry.getKey(), entry.getValue()));</a>
+<span class="sourceLineNo">173</span><a id="line.173">        }</a>
+<span class="sourceLineNo">174</span><a id="line.174">        for (SortedMap.Entry&lt;String, Timer&gt; entry : registry.getTimers(metricFilter).entrySet()) {</a>
+<span class="sourceLineNo">175</span><a id="line.175">            addToMap(mfSamplesMap, fromTimer(entry.getKey(), entry.getValue()));</a>
+<span class="sourceLineNo">176</span><a id="line.176">        }</a>
+<span class="sourceLineNo">177</span><a id="line.177">        for (SortedMap.Entry&lt;String, Meter&gt; entry : registry.getMeters(metricFilter).entrySet()) {</a>
+<span class="sourceLineNo">178</span><a id="line.178">            addToMap(mfSamplesMap, fromMeter(entry.getKey(), entry.getValue()));</a>
+<span class="sourceLineNo">179</span><a id="line.179">        }</a>
+<span class="sourceLineNo">180</span><a id="line.180">        return new ArrayList&lt;MetricFamilySamples&gt;(mfSamplesMap.values());</a>
+<span class="sourceLineNo">181</span><a id="line.181">    }</a>
+<span class="sourceLineNo">182</span><a id="line.182"></a>
+<span class="sourceLineNo">183</span><a id="line.183">    private void addToMap(Map&lt;String, MetricFamilySamples&gt; mfSamplesMap, MetricFamilySamples newMfSamples)</a>
+<span class="sourceLineNo">184</span><a id="line.184">    {</a>
+<span class="sourceLineNo">185</span><a id="line.185">        if (newMfSamples != null) {</a>
+<span class="sourceLineNo">186</span><a id="line.186">            MetricFamilySamples currentMfSamples = mfSamplesMap.get(newMfSamples.name);</a>
+<span class="sourceLineNo">187</span><a id="line.187">            if (currentMfSamples == null) {</a>
+<span class="sourceLineNo">188</span><a id="line.188">                mfSamplesMap.put(newMfSamples.name, newMfSamples);</a>
+<span class="sourceLineNo">189</span><a id="line.189">            } else {</a>
+<span class="sourceLineNo">190</span><a id="line.190">                List&lt;MetricFamilySamples.Sample&gt; samples = new ArrayList&lt;MetricFamilySamples.Sample&gt;(currentMfSamples.samples);</a>
+<span class="sourceLineNo">191</span><a id="line.191">                samples.addAll(newMfSamples.samples);</a>
+<span class="sourceLineNo">192</span><a id="line.192">                mfSamplesMap.put(newMfSamples.name, new MetricFamilySamples(newMfSamples.name, currentMfSamples.type, currentMfSamples.help, samples));</a>
+<span class="sourceLineNo">193</span><a id="line.193">            }</a>
+<span class="sourceLineNo">194</span><a id="line.194">        }</a>
+<span class="sourceLineNo">195</span><a id="line.195">    }</a>
+<span class="sourceLineNo">196</span><a id="line.196"></a>
+<span class="sourceLineNo">197</span><a id="line.197">    @Override</a>
+<span class="sourceLineNo">198</span><a id="line.198">    public List&lt;MetricFamilySamples&gt; describe() {</a>
+<span class="sourceLineNo">199</span><a id="line.199">        return new ArrayList&lt;MetricFamilySamples&gt;();</a>
+<span class="sourceLineNo">200</span><a id="line.200">    }</a>
+<span class="sourceLineNo">201</span><a id="line.201">}</a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</main>
+</body>
+</html>

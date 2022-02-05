@@ -1,0 +1,208 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<main role="main">
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.filter;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import io.prometheus.client.Adapter;</a>
+<span class="sourceLineNo">004</span><a id="line.4">import io.prometheus.client.servlet.common.filter.Filter;</a>
+<span class="sourceLineNo">005</span><a id="line.5">import io.prometheus.client.servlet.common.filter.FilterConfigurationException;</a>
+<span class="sourceLineNo">006</span><a id="line.6"></a>
+<span class="sourceLineNo">007</span><a id="line.7">import javax.servlet.*;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import javax.servlet.http.HttpServletRequest;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import javax.servlet.http.HttpServletResponse;</a>
+<span class="sourceLineNo">010</span><a id="line.10">import java.io.IOException;</a>
+<span class="sourceLineNo">011</span><a id="line.11"></a>
+<span class="sourceLineNo">012</span><a id="line.12">/**</a>
+<span class="sourceLineNo">013</span><a id="line.13"> * The MetricsFilter class provides a high-level filter that enables tunable collection of metrics for Servlet</a>
+<span class="sourceLineNo">014</span><a id="line.14"> * performance.</a>
+<span class="sourceLineNo">015</span><a id="line.15"> *</a>
+<span class="sourceLineNo">016</span><a id="line.16"> * This is the Javax version of the MetricsFilter. If you are using Jakarta Servlet, there is a Jakarta version</a>
+<span class="sourceLineNo">017</span><a id="line.17"> * available in {@code simpleclient-servlet-jakarta}.</a>
+<span class="sourceLineNo">018</span><a id="line.18"> *</a>
+<span class="sourceLineNo">019</span><a id="line.19"> * &lt;p&gt;The metric name itself is required, and configured with a {@code metric-name} init parameter.</a>
+<span class="sourceLineNo">020</span><a id="line.20"> *</a>
+<span class="sourceLineNo">021</span><a id="line.21"> * &lt;p&gt;The help parameter, configured with the {@code help} init parameter, is not required but strongly recommended.</a>
+<span class="sourceLineNo">022</span><a id="line.22"> *</a>
+<span class="sourceLineNo">023</span><a id="line.23"> * &lt;p&gt;The Histogram buckets can be configured with a {@code buckets} init parameter whose value is a comma-separated</a>
+<span class="sourceLineNo">024</span><a id="line.24"> * list * of valid {@code double} values. If omitted, the default buckets from {@link io.prometheus.client.Histogram}</a>
+<span class="sourceLineNo">025</span><a id="line.25"> * are used.</a>
+<span class="sourceLineNo">026</span><a id="line.26"> *</a>
+<span class="sourceLineNo">027</span><a id="line.27"> * &lt;p&gt;By default, this filter will provide metrics that distinguish only 1 level deep for the request path</a>
+<span class="sourceLineNo">028</span><a id="line.28"> * (including servlet context path), but can be configured with the {@code path-components} init parameter. Any number</a>
+<span class="sourceLineNo">029</span><a id="line.29"> * provided that is less than 1 will provide the full path granularity (warning, this may affect performance).</a>
+<span class="sourceLineNo">030</span><a id="line.30"> *</a>
+<span class="sourceLineNo">031</span><a id="line.31"> * &lt;p&gt;The {@code strip-context-path} init parameter can be used to avoid including the leading path components which are</a>
+<span class="sourceLineNo">032</span><a id="line.32"> * part of the context (i.e. the folder where the servlet is deployed) so that the same project deployed under different</a>
+<span class="sourceLineNo">033</span><a id="line.33"> * paths can produce the same metrics.</a>
+<span class="sourceLineNo">034</span><a id="line.34"> *</a>
+<span class="sourceLineNo">035</span><a id="line.35"> * &lt;p&gt;HTTP statuses will be aggregated via Counter. The name for this counter will be derived from the</a>
+<span class="sourceLineNo">036</span><a id="line.36"> * {@code metric-name} init parameter.</a>
+<span class="sourceLineNo">037</span><a id="line.37"> *</a>
+<span class="sourceLineNo">038</span><a id="line.38"> * &lt;pre&gt;{@code</a>
+<span class="sourceLineNo">039</span><a id="line.39"> * &lt;filter&gt;</a>
+<span class="sourceLineNo">040</span><a id="line.40"> *   &lt;filter-name&gt;prometheusFilter&lt;/filter-name&gt;</a>
+<span class="sourceLineNo">041</span><a id="line.41"> *   &lt;!-- This example shows the javax version. For Jakarta you would use --&gt;</a>
+<span class="sourceLineNo">042</span><a id="line.42"> *   &lt;!-- &lt;filter-class&gt;io.prometheus.client.filter.servlet.jakarta.MetricsFilter&lt;/filter-class&gt; --&gt;</a>
+<span class="sourceLineNo">043</span><a id="line.43"> *   &lt;filter-class&gt;io.prometheus.client.filter.MetricsFilter&lt;/filter-class&gt;</a>
+<span class="sourceLineNo">044</span><a id="line.44"> *   &lt;init-param&gt;</a>
+<span class="sourceLineNo">045</span><a id="line.45"> *     &lt;param-name&gt;metric-name&lt;/param-name&gt;</a>
+<span class="sourceLineNo">046</span><a id="line.46"> *     &lt;param-value&gt;webapp_metrics_filter&lt;/param-value&gt;</a>
+<span class="sourceLineNo">047</span><a id="line.47"> *   &lt;/init-param&gt;</a>
+<span class="sourceLineNo">048</span><a id="line.48"> *   &lt;!-- help is optional, defaults to the message below --&gt;</a>
+<span class="sourceLineNo">049</span><a id="line.49"> *   &lt;init-param&gt;</a>
+<span class="sourceLineNo">050</span><a id="line.50"> *     &lt;param-name&gt;help&lt;/param-name&gt;</a>
+<span class="sourceLineNo">051</span><a id="line.51"> *     &lt;param-value&gt;This is the help for your metrics filter&lt;/param-value&gt;</a>
+<span class="sourceLineNo">052</span><a id="line.52"> *   &lt;/init-param&gt;</a>
+<span class="sourceLineNo">053</span><a id="line.53"> *   &lt;!-- buckets is optional, unless specified the default buckets from io.prometheus.client.Histogram are used --&gt;</a>
+<span class="sourceLineNo">054</span><a id="line.54"> *   &lt;init-param&gt;</a>
+<span class="sourceLineNo">055</span><a id="line.55"> *     &lt;param-name&gt;buckets&lt;/param-name&gt;</a>
+<span class="sourceLineNo">056</span><a id="line.56"> *     &lt;param-value&gt;0.005,0.01,0.025,0.05,0.075,0.1,0.25,0.5,0.75,1,2.5,5,7.5,10&lt;/param-value&gt;</a>
+<span class="sourceLineNo">057</span><a id="line.57"> *   &lt;/init-param&gt;</a>
+<span class="sourceLineNo">058</span><a id="line.58"> *   &lt;!-- path-components is optional, anything less than 1 (1 is the default) means full granularity --&gt;</a>
+<span class="sourceLineNo">059</span><a id="line.59"> *   &lt;init-param&gt;</a>
+<span class="sourceLineNo">060</span><a id="line.60"> *     &lt;param-name&gt;path-components&lt;/param-name&gt;</a>
+<span class="sourceLineNo">061</span><a id="line.61"> *     &lt;param-value&gt;1&lt;/param-value&gt;</a>
+<span class="sourceLineNo">062</span><a id="line.62"> *   &lt;/init-param&gt;</a>
+<span class="sourceLineNo">063</span><a id="line.63"> *   &lt;!-- strip-context-path is optional, defaults to false --&gt;</a>
+<span class="sourceLineNo">064</span><a id="line.64"> *   &lt;init-param&gt;</a>
+<span class="sourceLineNo">065</span><a id="line.65"> *     &lt;param-name&gt;strip-context-path&lt;/param-name&gt;</a>
+<span class="sourceLineNo">066</span><a id="line.66"> *     &lt;param-value&gt;false&lt;/param-value&gt;</a>
+<span class="sourceLineNo">067</span><a id="line.67"> *   &lt;/init-param&gt;</a>
+<span class="sourceLineNo">068</span><a id="line.68"> * &lt;/filter&gt;</a>
+<span class="sourceLineNo">069</span><a id="line.69"> *</a>
+<span class="sourceLineNo">070</span><a id="line.70"> * &lt;!-- You will most likely want this to be the first filter in the chain</a>
+<span class="sourceLineNo">071</span><a id="line.71"> * (therefore the first &lt;filter-mapping&gt; in the web.xml file), so that you can get</a>
+<span class="sourceLineNo">072</span><a id="line.72"> * the most accurate measurement of latency. --&gt;</a>
+<span class="sourceLineNo">073</span><a id="line.73"> * &lt;filter-mapping&gt;</a>
+<span class="sourceLineNo">074</span><a id="line.74"> *   &lt;filter-name&gt;prometheusFilter&lt;/filter-name&gt;</a>
+<span class="sourceLineNo">075</span><a id="line.75"> *   &lt;url-pattern&gt;/*&lt;/url-pattern&gt;</a>
+<span class="sourceLineNo">076</span><a id="line.76"> * &lt;/filter-mapping&gt;</a>
+<span class="sourceLineNo">077</span><a id="line.77"> * }&lt;/pre&gt;</a>
+<span class="sourceLineNo">078</span><a id="line.78"> */</a>
+<span class="sourceLineNo">079</span><a id="line.79">public class MetricsFilter implements javax.servlet.Filter {</a>
+<span class="sourceLineNo">080</span><a id="line.80"></a>
+<span class="sourceLineNo">081</span><a id="line.81">    private final Filter delegate;</a>
+<span class="sourceLineNo">082</span><a id="line.82"></a>
+<span class="sourceLineNo">083</span><a id="line.83">    public MetricsFilter() {</a>
+<span class="sourceLineNo">084</span><a id="line.84">        this.delegate = new Filter();</a>
+<span class="sourceLineNo">085</span><a id="line.85">    }</a>
+<span class="sourceLineNo">086</span><a id="line.86"></a>
+<span class="sourceLineNo">087</span><a id="line.87">    // compatibility with 0.11.1 and older</a>
+<span class="sourceLineNo">088</span><a id="line.88">    public MetricsFilter(</a>
+<span class="sourceLineNo">089</span><a id="line.89">            String metricName,</a>
+<span class="sourceLineNo">090</span><a id="line.90">            String help,</a>
+<span class="sourceLineNo">091</span><a id="line.91">            Integer pathComponents,</a>
+<span class="sourceLineNo">092</span><a id="line.92">            double[] buckets) {</a>
+<span class="sourceLineNo">093</span><a id="line.93">        this(metricName, help, pathComponents, buckets, false);</a>
+<span class="sourceLineNo">094</span><a id="line.94">    }</a>
+<span class="sourceLineNo">095</span><a id="line.95"></a>
+<span class="sourceLineNo">096</span><a id="line.96">    /**</a>
+<span class="sourceLineNo">097</span><a id="line.97">     * See {@link Filter#Filter(String, String, Integer, double[], boolean)}.</a>
+<span class="sourceLineNo">098</span><a id="line.98">     */</a>
+<span class="sourceLineNo">099</span><a id="line.99">    public MetricsFilter(</a>
+<span class="sourceLineNo">100</span><a id="line.100">            String metricName,</a>
+<span class="sourceLineNo">101</span><a id="line.101">            String help,</a>
+<span class="sourceLineNo">102</span><a id="line.102">            Integer pathComponents,</a>
+<span class="sourceLineNo">103</span><a id="line.103">            double[] buckets,</a>
+<span class="sourceLineNo">104</span><a id="line.104">            boolean stripContextPath) {</a>
+<span class="sourceLineNo">105</span><a id="line.105">        this.delegate = new Filter(metricName, help, pathComponents, buckets, stripContextPath);</a>
+<span class="sourceLineNo">106</span><a id="line.106">    }</a>
+<span class="sourceLineNo">107</span><a id="line.107"></a>
+<span class="sourceLineNo">108</span><a id="line.108">    @Override</a>
+<span class="sourceLineNo">109</span><a id="line.109">    public void init(FilterConfig filterConfig) throws ServletException {</a>
+<span class="sourceLineNo">110</span><a id="line.110">        try {</a>
+<span class="sourceLineNo">111</span><a id="line.111">            delegate.init(Adapter.wrap(filterConfig));</a>
+<span class="sourceLineNo">112</span><a id="line.112">        } catch (FilterConfigurationException e) {</a>
+<span class="sourceLineNo">113</span><a id="line.113">            throw new ServletException(e);</a>
+<span class="sourceLineNo">114</span><a id="line.114">        }</a>
+<span class="sourceLineNo">115</span><a id="line.115">    }</a>
+<span class="sourceLineNo">116</span><a id="line.116"></a>
+<span class="sourceLineNo">117</span><a id="line.117">    @Override</a>
+<span class="sourceLineNo">118</span><a id="line.118">    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {</a>
+<span class="sourceLineNo">119</span><a id="line.119">        if (!(servletRequest instanceof HttpServletRequest) || !(servletResponse instanceof HttpServletResponse)) {</a>
+<span class="sourceLineNo">120</span><a id="line.120">            filterChain.doFilter(servletRequest, servletResponse);</a>
+<span class="sourceLineNo">121</span><a id="line.121">            return;</a>
+<span class="sourceLineNo">122</span><a id="line.122">        }</a>
+<span class="sourceLineNo">123</span><a id="line.123">        Filter.MetricData data = delegate.startTimer(Adapter.wrap((HttpServletRequest) servletRequest));</a>
+<span class="sourceLineNo">124</span><a id="line.124">        try {</a>
+<span class="sourceLineNo">125</span><a id="line.125">            filterChain.doFilter(servletRequest, servletResponse);</a>
+<span class="sourceLineNo">126</span><a id="line.126">        } finally {</a>
+<span class="sourceLineNo">127</span><a id="line.127">            delegate.observeDuration(data, Adapter.wrap((HttpServletResponse) servletResponse));</a>
+<span class="sourceLineNo">128</span><a id="line.128">        }</a>
+<span class="sourceLineNo">129</span><a id="line.129">    }</a>
+<span class="sourceLineNo">130</span><a id="line.130"></a>
+<span class="sourceLineNo">131</span><a id="line.131">    @Override</a>
+<span class="sourceLineNo">132</span><a id="line.132">    public void destroy() {</a>
+<span class="sourceLineNo">133</span><a id="line.133">    }</a>
+<span class="sourceLineNo">134</span><a id="line.134">}</a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</main>
+</body>
+</html>

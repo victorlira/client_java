@@ -1,0 +1,136 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<main role="main">
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.jetty;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import io.prometheus.client.Collector;</a>
+<span class="sourceLineNo">004</span><a id="line.4">import io.prometheus.client.CollectorRegistry;</a>
+<span class="sourceLineNo">005</span><a id="line.5">import io.prometheus.client.GaugeMetricFamily;</a>
+<span class="sourceLineNo">006</span><a id="line.6">import java.util.Arrays;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import java.util.Collections;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import java.util.List;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import java.util.Map;</a>
+<span class="sourceLineNo">010</span><a id="line.10">import java.util.concurrent.ConcurrentHashMap;</a>
+<span class="sourceLineNo">011</span><a id="line.11">import java.util.function.Function;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import org.eclipse.jetty.util.thread.QueuedThreadPool;</a>
+<span class="sourceLineNo">013</span><a id="line.13"></a>
+<span class="sourceLineNo">014</span><a id="line.14">public class QueuedThreadPoolStatisticsCollector extends Collector {</a>
+<span class="sourceLineNo">015</span><a id="line.15"></a>
+<span class="sourceLineNo">016</span><a id="line.16">  private static final List&lt;String&gt; LABEL_NAMES = Collections.singletonList("unit");</a>
+<span class="sourceLineNo">017</span><a id="line.17"></a>
+<span class="sourceLineNo">018</span><a id="line.18">  private final Map&lt;String, QueuedThreadPool&gt; queuedThreadPoolMap = new ConcurrentHashMap&lt;&gt;();</a>
+<span class="sourceLineNo">019</span><a id="line.19"></a>
+<span class="sourceLineNo">020</span><a id="line.20">  public QueuedThreadPoolStatisticsCollector() {</a>
+<span class="sourceLineNo">021</span><a id="line.21">  }</a>
+<span class="sourceLineNo">022</span><a id="line.22"></a>
+<span class="sourceLineNo">023</span><a id="line.23">  public QueuedThreadPoolStatisticsCollector(QueuedThreadPool queuedThreadPool, String name) {</a>
+<span class="sourceLineNo">024</span><a id="line.24">    add(queuedThreadPool, name);</a>
+<span class="sourceLineNo">025</span><a id="line.25">  }</a>
+<span class="sourceLineNo">026</span><a id="line.26"></a>
+<span class="sourceLineNo">027</span><a id="line.27">  public QueuedThreadPoolStatisticsCollector add(QueuedThreadPool queuedThreadPool, String name) {</a>
+<span class="sourceLineNo">028</span><a id="line.28">    queuedThreadPoolMap.put(name, queuedThreadPool);</a>
+<span class="sourceLineNo">029</span><a id="line.29">    return this;</a>
+<span class="sourceLineNo">030</span><a id="line.30">  }</a>
+<span class="sourceLineNo">031</span><a id="line.31"></a>
+<span class="sourceLineNo">032</span><a id="line.32">  @Override</a>
+<span class="sourceLineNo">033</span><a id="line.33">  public List&lt;MetricFamilySamples&gt; collect() {</a>
+<span class="sourceLineNo">034</span><a id="line.34">    return Arrays.asList(</a>
+<span class="sourceLineNo">035</span><a id="line.35">        buildGauge("jetty_queued_thread_pool_threads", "Number of total threads",</a>
+<span class="sourceLineNo">036</span><a id="line.36">            QueuedThreadPool::getThreads),</a>
+<span class="sourceLineNo">037</span><a id="line.37">        buildGauge("jetty_queued_thread_pool_threads_idle", "Number of idle threads",</a>
+<span class="sourceLineNo">038</span><a id="line.38">            QueuedThreadPool::getIdleThreads),</a>
+<span class="sourceLineNo">039</span><a id="line.39">        buildGauge("jetty_queued_thread_pool_threads_max", "Max size of thread pool",</a>
+<span class="sourceLineNo">040</span><a id="line.40">            QueuedThreadPool::getMaxThreads),</a>
+<span class="sourceLineNo">041</span><a id="line.41">        buildGauge("jetty_queued_thread_pool_jobs", "Number of total jobs",</a>
+<span class="sourceLineNo">042</span><a id="line.42">            QueuedThreadPool::getQueueSize));</a>
+<span class="sourceLineNo">043</span><a id="line.43">  }</a>
+<span class="sourceLineNo">044</span><a id="line.44"></a>
+<span class="sourceLineNo">045</span><a id="line.45">  @Override</a>
+<span class="sourceLineNo">046</span><a id="line.46">  public &lt;T extends Collector&gt; T register(CollectorRegistry registry) {</a>
+<span class="sourceLineNo">047</span><a id="line.47">    if (queuedThreadPoolMap.isEmpty()) {</a>
+<span class="sourceLineNo">048</span><a id="line.48">      throw new IllegalStateException("You must register at least one QueuedThreadPool.");</a>
+<span class="sourceLineNo">049</span><a id="line.49">    }</a>
+<span class="sourceLineNo">050</span><a id="line.50">    return super.register(registry);</a>
+<span class="sourceLineNo">051</span><a id="line.51">  }</a>
+<span class="sourceLineNo">052</span><a id="line.52"></a>
+<span class="sourceLineNo">053</span><a id="line.53">  private GaugeMetricFamily buildGauge(String metric, String help,</a>
+<span class="sourceLineNo">054</span><a id="line.54">      Function&lt;QueuedThreadPool, Integer&gt; metricValueProvider) {</a>
+<span class="sourceLineNo">055</span><a id="line.55">    final GaugeMetricFamily metricFamily = new GaugeMetricFamily(metric, help, LABEL_NAMES);</a>
+<span class="sourceLineNo">056</span><a id="line.56">    queuedThreadPoolMap.forEach((key, value) -&gt; metricFamily.addMetric(</a>
+<span class="sourceLineNo">057</span><a id="line.57">        Collections.singletonList(key),</a>
+<span class="sourceLineNo">058</span><a id="line.58">        metricValueProvider.apply(value)</a>
+<span class="sourceLineNo">059</span><a id="line.59">    ));</a>
+<span class="sourceLineNo">060</span><a id="line.60">    return metricFamily;</a>
+<span class="sourceLineNo">061</span><a id="line.61">  }</a>
+<span class="sourceLineNo">062</span><a id="line.62">}</a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</main>
+</body>
+</html>

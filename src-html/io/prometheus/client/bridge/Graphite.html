@@ -1,0 +1,195 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<main role="main">
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.bridge;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import io.prometheus.client.Collector;</a>
+<span class="sourceLineNo">004</span><a id="line.4">import io.prometheus.client.CollectorRegistry;</a>
+<span class="sourceLineNo">005</span><a id="line.5"></a>
+<span class="sourceLineNo">006</span><a id="line.6">import java.io.BufferedWriter;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import java.io.IOException;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import java.io.OutputStreamWriter;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import java.io.PrintWriter;</a>
+<span class="sourceLineNo">010</span><a id="line.10">import java.net.Socket;</a>
+<span class="sourceLineNo">011</span><a id="line.11">import java.nio.charset.Charset;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import java.util.Collections;</a>
+<span class="sourceLineNo">013</span><a id="line.13">import java.util.logging.Level;</a>
+<span class="sourceLineNo">014</span><a id="line.14">import java.util.logging.Logger;</a>
+<span class="sourceLineNo">015</span><a id="line.15">import java.util.regex.Pattern;</a>
+<span class="sourceLineNo">016</span><a id="line.16">import java.util.regex.Matcher;</a>
+<span class="sourceLineNo">017</span><a id="line.17"></a>
+<span class="sourceLineNo">018</span><a id="line.18">/**</a>
+<span class="sourceLineNo">019</span><a id="line.19"> * Export metrics in the Graphite plaintext format.</a>
+<span class="sourceLineNo">020</span><a id="line.20"> * &lt;p&gt;</a>
+<span class="sourceLineNo">021</span><a id="line.21"> * &lt;pre&gt;</a>
+<span class="sourceLineNo">022</span><a id="line.22"> * {@code</a>
+<span class="sourceLineNo">023</span><a id="line.23"> *  Graphite g = new Graphite("localhost", 2003);</a>
+<span class="sourceLineNo">024</span><a id="line.24"> *  // Push the default registry once.</a>
+<span class="sourceLineNo">025</span><a id="line.25"> *  g.push(CollectorRegistry.defaultRegistry);</a>
+<span class="sourceLineNo">026</span><a id="line.26"> *</a>
+<span class="sourceLineNo">027</span><a id="line.27"> *  // Push the default registry every 60 seconds.</a>
+<span class="sourceLineNo">028</span><a id="line.28"> *  Thread thread = g.start(CollectorRegistry.defaultRegistry, 60);</a>
+<span class="sourceLineNo">029</span><a id="line.29"> *  // Stop pushing.</a>
+<span class="sourceLineNo">030</span><a id="line.30"> *  thread.interrupt();</a>
+<span class="sourceLineNo">031</span><a id="line.31"> *  thread.join();</a>
+<span class="sourceLineNo">032</span><a id="line.32"> * }</a>
+<span class="sourceLineNo">033</span><a id="line.33"> * &lt;/pre&gt;</a>
+<span class="sourceLineNo">034</span><a id="line.34"> * &lt;p&gt;</a>
+<span class="sourceLineNo">035</span><a id="line.35"> */</a>
+<span class="sourceLineNo">036</span><a id="line.36">public class Graphite {</a>
+<span class="sourceLineNo">037</span><a id="line.37">  private static final Logger logger = Logger.getLogger(Graphite.class.getName());</a>
+<span class="sourceLineNo">038</span><a id="line.38"></a>
+<span class="sourceLineNo">039</span><a id="line.39">  private final String host;</a>
+<span class="sourceLineNo">040</span><a id="line.40">  private final int port;</a>
+<span class="sourceLineNo">041</span><a id="line.41">  private static final Pattern INVALID_GRAPHITE_CHARS = Pattern.compile("[^a-zA-Z0-9_-]");</a>
+<span class="sourceLineNo">042</span><a id="line.42">  /**</a>
+<span class="sourceLineNo">043</span><a id="line.43">   * Construct a Graphite Bridge with the given host:port.</a>
+<span class="sourceLineNo">044</span><a id="line.44">   */</a>
+<span class="sourceLineNo">045</span><a id="line.45">  public Graphite(String host, int port) {</a>
+<span class="sourceLineNo">046</span><a id="line.46">    this.host = host;</a>
+<span class="sourceLineNo">047</span><a id="line.47">    this.port = port;</a>
+<span class="sourceLineNo">048</span><a id="line.48">  }</a>
+<span class="sourceLineNo">049</span><a id="line.49"></a>
+<span class="sourceLineNo">050</span><a id="line.50">  /**</a>
+<span class="sourceLineNo">051</span><a id="line.51">   * Push samples from the given registry to Graphite.</a>
+<span class="sourceLineNo">052</span><a id="line.52">   */</a>
+<span class="sourceLineNo">053</span><a id="line.53">  public void push(CollectorRegistry registry) throws IOException {</a>
+<span class="sourceLineNo">054</span><a id="line.54">    Socket s = new Socket(host, port);</a>
+<span class="sourceLineNo">055</span><a id="line.55">    BufferedWriter writer = new BufferedWriter(new PrintWriter(new OutputStreamWriter(s.getOutputStream(), Charset.forName("UTF-8"))));</a>
+<span class="sourceLineNo">056</span><a id="line.56">    Matcher m = INVALID_GRAPHITE_CHARS.matcher("");</a>
+<span class="sourceLineNo">057</span><a id="line.57">    long now = System.currentTimeMillis() / 1000;</a>
+<span class="sourceLineNo">058</span><a id="line.58">    for (Collector.MetricFamilySamples metricFamilySamples: Collections.list(registry.metricFamilySamples())) {</a>
+<span class="sourceLineNo">059</span><a id="line.59">      for (Collector.MetricFamilySamples.Sample sample: metricFamilySamples.samples) {</a>
+<span class="sourceLineNo">060</span><a id="line.60">        m.reset(sample.name);</a>
+<span class="sourceLineNo">061</span><a id="line.61">        writer.write(m.replaceAll("_"));</a>
+<span class="sourceLineNo">062</span><a id="line.62">        for (int i = 0; i &lt; sample.labelNames.size(); ++i) {</a>
+<span class="sourceLineNo">063</span><a id="line.63">          m.reset(sample.labelValues.get(i));</a>
+<span class="sourceLineNo">064</span><a id="line.64">          writer.write("." + sample.labelNames.get(i) + "." + m.replaceAll("_"));</a>
+<span class="sourceLineNo">065</span><a id="line.65">        }</a>
+<span class="sourceLineNo">066</span><a id="line.66">        writer.write(" " + sample.value + " " + now + "\n");</a>
+<span class="sourceLineNo">067</span><a id="line.67">      }</a>
+<span class="sourceLineNo">068</span><a id="line.68">    }</a>
+<span class="sourceLineNo">069</span><a id="line.69">    writer.close();</a>
+<span class="sourceLineNo">070</span><a id="line.70">    s.close();</a>
+<span class="sourceLineNo">071</span><a id="line.71">  }</a>
+<span class="sourceLineNo">072</span><a id="line.72"></a>
+<span class="sourceLineNo">073</span><a id="line.73">  /**</a>
+<span class="sourceLineNo">074</span><a id="line.74">   * Push samples from the given registry to Graphite every minute.</a>
+<span class="sourceLineNo">075</span><a id="line.75">   */</a>
+<span class="sourceLineNo">076</span><a id="line.76">  public Thread start(CollectorRegistry registry) {</a>
+<span class="sourceLineNo">077</span><a id="line.77">    return start(registry, 60);</a>
+<span class="sourceLineNo">078</span><a id="line.78">  }</a>
+<span class="sourceLineNo">079</span><a id="line.79"></a>
+<span class="sourceLineNo">080</span><a id="line.80">  /**</a>
+<span class="sourceLineNo">081</span><a id="line.81">   * Push samples from the given registry to Graphite at the given interval.</a>
+<span class="sourceLineNo">082</span><a id="line.82">   */</a>
+<span class="sourceLineNo">083</span><a id="line.83">  public Thread start(CollectorRegistry registry, int intervalSeconds) {</a>
+<span class="sourceLineNo">084</span><a id="line.84">    Thread thread = new PushThread(registry, intervalSeconds);</a>
+<span class="sourceLineNo">085</span><a id="line.85">    thread.setDaemon(true);</a>
+<span class="sourceLineNo">086</span><a id="line.86">    thread.start();</a>
+<span class="sourceLineNo">087</span><a id="line.87">    return thread;</a>
+<span class="sourceLineNo">088</span><a id="line.88">  }</a>
+<span class="sourceLineNo">089</span><a id="line.89"></a>
+<span class="sourceLineNo">090</span><a id="line.90">  private class PushThread extends Thread {</a>
+<span class="sourceLineNo">091</span><a id="line.91">    private final CollectorRegistry registry;</a>
+<span class="sourceLineNo">092</span><a id="line.92">    private final int intervalSeconds;</a>
+<span class="sourceLineNo">093</span><a id="line.93"></a>
+<span class="sourceLineNo">094</span><a id="line.94">    PushThread(CollectorRegistry registry, int intervalSeconds) {</a>
+<span class="sourceLineNo">095</span><a id="line.95">      this.registry = registry;</a>
+<span class="sourceLineNo">096</span><a id="line.96">      this.intervalSeconds = intervalSeconds;</a>
+<span class="sourceLineNo">097</span><a id="line.97">    }</a>
+<span class="sourceLineNo">098</span><a id="line.98"></a>
+<span class="sourceLineNo">099</span><a id="line.99">    public void run() {</a>
+<span class="sourceLineNo">100</span><a id="line.100">      long waitUntil = System.currentTimeMillis();</a>
+<span class="sourceLineNo">101</span><a id="line.101">      while (true) {</a>
+<span class="sourceLineNo">102</span><a id="line.102">        try {</a>
+<span class="sourceLineNo">103</span><a id="line.103">          push(registry);</a>
+<span class="sourceLineNo">104</span><a id="line.104">        } catch (IOException e) {</a>
+<span class="sourceLineNo">105</span><a id="line.105">          logger.log(Level.WARNING, "Exception " + e + " pushing to " + host + ":" + port, e);</a>
+<span class="sourceLineNo">106</span><a id="line.106">        }</a>
+<span class="sourceLineNo">107</span><a id="line.107"></a>
+<span class="sourceLineNo">108</span><a id="line.108">        long now = System.currentTimeMillis();</a>
+<span class="sourceLineNo">109</span><a id="line.109">        // We may skip some pushes if we're falling behind.</a>
+<span class="sourceLineNo">110</span><a id="line.110">        while (now &gt;= waitUntil) {</a>
+<span class="sourceLineNo">111</span><a id="line.111">          waitUntil += intervalSeconds * 1000;</a>
+<span class="sourceLineNo">112</span><a id="line.112">        }</a>
+<span class="sourceLineNo">113</span><a id="line.113">        try {</a>
+<span class="sourceLineNo">114</span><a id="line.114">          Thread.sleep(waitUntil - now);</a>
+<span class="sourceLineNo">115</span><a id="line.115">        } catch (InterruptedException e) {</a>
+<span class="sourceLineNo">116</span><a id="line.116">          return;</a>
+<span class="sourceLineNo">117</span><a id="line.117">        }</a>
+<span class="sourceLineNo">118</span><a id="line.118">      }</a>
+<span class="sourceLineNo">119</span><a id="line.119">    }</a>
+<span class="sourceLineNo">120</span><a id="line.120">  }</a>
+<span class="sourceLineNo">121</span><a id="line.121">}</a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</main>
+</body>
+</html>

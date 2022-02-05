@@ -1,0 +1,194 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<title>Source code</title>
+<link rel="stylesheet" type="text/css" href="../../../../../../stylesheet.css" title="Style">
+</head>
+<body>
+<main role="main">
+<div class="sourceContainer">
+<pre><span class="sourceLineNo">001</span><a id="line.1">package io.prometheus.client.spring.web;</a>
+<span class="sourceLineNo">002</span><a id="line.2"></a>
+<span class="sourceLineNo">003</span><a id="line.3">import io.prometheus.client.Summary;</a>
+<span class="sourceLineNo">004</span><a id="line.4">import org.aspectj.lang.ProceedingJoinPoint;</a>
+<span class="sourceLineNo">005</span><a id="line.5">import org.aspectj.lang.annotation.Around;</a>
+<span class="sourceLineNo">006</span><a id="line.6">import org.aspectj.lang.annotation.Aspect;</a>
+<span class="sourceLineNo">007</span><a id="line.7">import org.aspectj.lang.annotation.Pointcut;</a>
+<span class="sourceLineNo">008</span><a id="line.8">import org.aspectj.lang.reflect.MethodSignature;</a>
+<span class="sourceLineNo">009</span><a id="line.9">import org.springframework.context.annotation.Scope;</a>
+<span class="sourceLineNo">010</span><a id="line.10">import org.springframework.core.annotation.AnnotationUtils;</a>
+<span class="sourceLineNo">011</span><a id="line.11">import org.springframework.util.ReflectionUtils;</a>
+<span class="sourceLineNo">012</span><a id="line.12">import org.springframework.web.bind.annotation.ControllerAdvice;</a>
+<span class="sourceLineNo">013</span><a id="line.13"></a>
+<span class="sourceLineNo">014</span><a id="line.14">import java.lang.reflect.Method;</a>
+<span class="sourceLineNo">015</span><a id="line.15">import java.util.HashMap;</a>
+<span class="sourceLineNo">016</span><a id="line.16">import java.util.concurrent.locks.Lock;</a>
+<span class="sourceLineNo">017</span><a id="line.17">import java.util.concurrent.locks.ReadWriteLock;</a>
+<span class="sourceLineNo">018</span><a id="line.18">import java.util.concurrent.locks.ReentrantReadWriteLock;</a>
+<span class="sourceLineNo">019</span><a id="line.19"></a>
+<span class="sourceLineNo">020</span><a id="line.20">/**</a>
+<span class="sourceLineNo">021</span><a id="line.21"> * This class automatically times (via aspectj) the execution of annotated methods, if it's been enabled via {@link EnablePrometheusTiming},</a>
+<span class="sourceLineNo">022</span><a id="line.22"> * for methods annotated with {@link PrometheusTimeMethod}</a>
+<span class="sourceLineNo">023</span><a id="line.23"> *</a>
+<span class="sourceLineNo">024</span><a id="line.24"> * @author Andrew Stuart</a>
+<span class="sourceLineNo">025</span><a id="line.25"> */</a>
+<span class="sourceLineNo">026</span><a id="line.26">@Aspect("pertarget(io.prometheus.client.spring.web.MethodTimer.timeable())")</a>
+<span class="sourceLineNo">027</span><a id="line.27">@Scope("prototype")</a>
+<span class="sourceLineNo">028</span><a id="line.28">@ControllerAdvice</a>
+<span class="sourceLineNo">029</span><a id="line.29">public class MethodTimer {</a>
+<span class="sourceLineNo">030</span><a id="line.30">    private final ReadWriteLock summaryLock = new ReentrantReadWriteLock();</a>
+<span class="sourceLineNo">031</span><a id="line.31">    private final HashMap&lt;String, Summary&gt; summaries = new HashMap&lt;String, Summary&gt;();</a>
+<span class="sourceLineNo">032</span><a id="line.32"></a>
+<span class="sourceLineNo">033</span><a id="line.33">    @Pointcut("@annotation(io.prometheus.client.spring.web.PrometheusTimeMethod)")</a>
+<span class="sourceLineNo">034</span><a id="line.34">    public void annotatedMethod() {}</a>
+<span class="sourceLineNo">035</span><a id="line.35"></a>
+<span class="sourceLineNo">036</span><a id="line.36">    @Pointcut("annotatedMethod()")</a>
+<span class="sourceLineNo">037</span><a id="line.37">    public void timeable() {}</a>
+<span class="sourceLineNo">038</span><a id="line.38"></a>
+<span class="sourceLineNo">039</span><a id="line.39">    private PrometheusTimeMethod getAnnotation(ProceedingJoinPoint pjp) throws NoSuchMethodException {</a>
+<span class="sourceLineNo">040</span><a id="line.40">        assert(pjp.getSignature() instanceof MethodSignature);</a>
+<span class="sourceLineNo">041</span><a id="line.41">        MethodSignature signature = (MethodSignature) pjp.getSignature();</a>
+<span class="sourceLineNo">042</span><a id="line.42"></a>
+<span class="sourceLineNo">043</span><a id="line.43">        PrometheusTimeMethod annot = AnnotationUtils.findAnnotation(pjp.getTarget().getClass(), PrometheusTimeMethod.class);</a>
+<span class="sourceLineNo">044</span><a id="line.44">        if (annot != null) {</a>
+<span class="sourceLineNo">045</span><a id="line.45">            return annot;</a>
+<span class="sourceLineNo">046</span><a id="line.46">        }</a>
+<span class="sourceLineNo">047</span><a id="line.47"></a>
+<span class="sourceLineNo">048</span><a id="line.48">        // When target is an AOP interface proxy but annotation is on class method (rather than Interface method).</a>
+<span class="sourceLineNo">049</span><a id="line.49">        final String name = signature.getName();</a>
+<span class="sourceLineNo">050</span><a id="line.50">        final Class[] parameterTypes = signature.getParameterTypes();</a>
+<span class="sourceLineNo">051</span><a id="line.51">        Method method = ReflectionUtils.findMethod(pjp.getTarget().getClass(), name, parameterTypes);</a>
+<span class="sourceLineNo">052</span><a id="line.52">        return AnnotationUtils.findAnnotation(method, PrometheusTimeMethod.class);</a>
+<span class="sourceLineNo">053</span><a id="line.53">    }</a>
+<span class="sourceLineNo">054</span><a id="line.54"></a>
+<span class="sourceLineNo">055</span><a id="line.55">    private Summary ensureSummary(ProceedingJoinPoint pjp, String key) throws IllegalStateException {</a>
+<span class="sourceLineNo">056</span><a id="line.56">        PrometheusTimeMethod annot;</a>
+<span class="sourceLineNo">057</span><a id="line.57">        try {</a>
+<span class="sourceLineNo">058</span><a id="line.58">            annot = getAnnotation(pjp);</a>
+<span class="sourceLineNo">059</span><a id="line.59">        } catch (NoSuchMethodException e) {</a>
+<span class="sourceLineNo">060</span><a id="line.60">            throw new IllegalStateException("Annotation could not be found for pjp \"" + pjp.toShortString() +"\"", e);</a>
+<span class="sourceLineNo">061</span><a id="line.61">        } catch (NullPointerException e) {</a>
+<span class="sourceLineNo">062</span><a id="line.62">            throw new IllegalStateException("Annotation could not be found for pjp \"" + pjp.toShortString() +"\"", e);</a>
+<span class="sourceLineNo">063</span><a id="line.63">        }</a>
+<span class="sourceLineNo">064</span><a id="line.64"></a>
+<span class="sourceLineNo">065</span><a id="line.65">        assert(annot != null);</a>
+<span class="sourceLineNo">066</span><a id="line.66"></a>
+<span class="sourceLineNo">067</span><a id="line.67">        Summary summary;</a>
+<span class="sourceLineNo">068</span><a id="line.68"></a>
+<span class="sourceLineNo">069</span><a id="line.69">        // We use a writeLock here to guarantee no concurrent reads.</a>
+<span class="sourceLineNo">070</span><a id="line.70">        final Lock writeLock = summaryLock.writeLock();</a>
+<span class="sourceLineNo">071</span><a id="line.71">        writeLock.lock();</a>
+<span class="sourceLineNo">072</span><a id="line.72">        try {</a>
+<span class="sourceLineNo">073</span><a id="line.73">            // Check one last time with full mutual exclusion in case multiple readers got null before creation.</a>
+<span class="sourceLineNo">074</span><a id="line.74">            summary = summaries.get(key);</a>
+<span class="sourceLineNo">075</span><a id="line.75">            if (summary != null) {</a>
+<span class="sourceLineNo">076</span><a id="line.76">                return summary;</a>
+<span class="sourceLineNo">077</span><a id="line.77">            }</a>
+<span class="sourceLineNo">078</span><a id="line.78"></a>
+<span class="sourceLineNo">079</span><a id="line.79">            // Now we know for sure that we have never before registered.</a>
+<span class="sourceLineNo">080</span><a id="line.80">            summary = Summary.build()</a>
+<span class="sourceLineNo">081</span><a id="line.81">                    .name(annot.name())</a>
+<span class="sourceLineNo">082</span><a id="line.82">                    .help(annot.help())</a>
+<span class="sourceLineNo">083</span><a id="line.83">                    .register();</a>
+<span class="sourceLineNo">084</span><a id="line.84"></a>
+<span class="sourceLineNo">085</span><a id="line.85">            // Even a rehash of the underlying table will not cause issues as we mutually exclude readers while we</a>
+<span class="sourceLineNo">086</span><a id="line.86">            // perform our updates.</a>
+<span class="sourceLineNo">087</span><a id="line.87">            summaries.put(key, summary);</a>
+<span class="sourceLineNo">088</span><a id="line.88"></a>
+<span class="sourceLineNo">089</span><a id="line.89">            return summary;</a>
+<span class="sourceLineNo">090</span><a id="line.90">        } finally {</a>
+<span class="sourceLineNo">091</span><a id="line.91">            writeLock.unlock();</a>
+<span class="sourceLineNo">092</span><a id="line.92">        }</a>
+<span class="sourceLineNo">093</span><a id="line.93">    }</a>
+<span class="sourceLineNo">094</span><a id="line.94"></a>
+<span class="sourceLineNo">095</span><a id="line.95">    @Around("timeable()")</a>
+<span class="sourceLineNo">096</span><a id="line.96">    public Object timeMethod(ProceedingJoinPoint pjp) throws Throwable {</a>
+<span class="sourceLineNo">097</span><a id="line.97">        String key = pjp.getSignature().toLongString();</a>
+<span class="sourceLineNo">098</span><a id="line.98"></a>
+<span class="sourceLineNo">099</span><a id="line.99">        Summary summary;</a>
+<span class="sourceLineNo">100</span><a id="line.100">        final Lock r = summaryLock.readLock();</a>
+<span class="sourceLineNo">101</span><a id="line.101">        r.lock();</a>
+<span class="sourceLineNo">102</span><a id="line.102">        try {</a>
+<span class="sourceLineNo">103</span><a id="line.103">            summary = summaries.get(key);</a>
+<span class="sourceLineNo">104</span><a id="line.104">        } finally {</a>
+<span class="sourceLineNo">105</span><a id="line.105">            r.unlock();</a>
+<span class="sourceLineNo">106</span><a id="line.106">        }</a>
+<span class="sourceLineNo">107</span><a id="line.107"></a>
+<span class="sourceLineNo">108</span><a id="line.108">        if (summary == null) {</a>
+<span class="sourceLineNo">109</span><a id="line.109">            summary = ensureSummary(pjp, key);</a>
+<span class="sourceLineNo">110</span><a id="line.110">        }</a>
+<span class="sourceLineNo">111</span><a id="line.111"></a>
+<span class="sourceLineNo">112</span><a id="line.112">        final Summary.Timer t = summary.startTimer();</a>
+<span class="sourceLineNo">113</span><a id="line.113"></a>
+<span class="sourceLineNo">114</span><a id="line.114">        try {</a>
+<span class="sourceLineNo">115</span><a id="line.115">            return pjp.proceed();</a>
+<span class="sourceLineNo">116</span><a id="line.116">        } finally {</a>
+<span class="sourceLineNo">117</span><a id="line.117">            t.observeDuration();</a>
+<span class="sourceLineNo">118</span><a id="line.118">        }</a>
+<span class="sourceLineNo">119</span><a id="line.119">    }</a>
+<span class="sourceLineNo">120</span><a id="line.120">}</a>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre>
+</div>
+</main>
+</body>
+</html>
